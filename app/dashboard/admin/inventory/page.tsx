@@ -57,7 +57,10 @@ export default function InventoryPage() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<any>(null);
+  
+  // --- FITUR BARU: STATE UNTUK ANIMASI SUCCESS ---
   const [isSaving, setIsSaving] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); 
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -101,7 +104,6 @@ export default function InventoryPage() {
     fetchMachines();
   }, []);
 
-  // --- FILTER SOFT DELETE: Hanya tarik data yang is_deleted == false ---
   const fetchMachines = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
@@ -118,11 +120,12 @@ export default function InventoryPage() {
     setSelectedMachine(machine);
     setEditFotoFile(null); 
     setEditManualFile(null);
+    setIsSuccess(false); // Reset status sukses setiap buka modal baru
     setEditFormData({
       product_id: machine.product_id || "", 
       serial_number: machine.serial_number || "",
       nama_mesin: machine.nama_mesin || "", 
-      nama_klien: machine.nama_klien || "", // Load nama_klien
+      nama_klien: machine.nama_klien || "",
       kategori: machine.kategori || "",
       pabrikan: machine.pabrikan || "", 
       negara_asal: machine.negara_asal || "",
@@ -142,7 +145,7 @@ export default function InventoryPage() {
     let fotoUrl = selectedMachine.foto_mesin;
     let manualUrl = selectedMachine.buku_manual;
 
-    // --- PENJAGA PINTU 1: ERROR UPLOAD FOTO ---
+    // Upload Foto Baru (jika ada)
     if (editFotoFile) {
       const fileExt = editFotoFile.name.split('.').pop();
       const fileName = `${Date.now()}-foto.${fileExt}`;
@@ -151,16 +154,15 @@ export default function InventoryPage() {
       if (fotoError) {
         alert("Gagal mengupload foto baru: " + fotoError.message);
         setIsSaving(false);
-        return; // STOP!
+        return; 
       }
-      
       if (data) {
         const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`foto/${fileName}`);
         fotoUrl = pubUrl.publicUrl;
       }
     }
 
-    // --- PENJAGA PINTU 2: ERROR UPLOAD MANUAL ---
+    // Upload Manual Baru (jika ada)
     if (editManualFile) {
       const fileExt = editManualFile.name.split('.').pop();
       const fileName = `${Date.now()}-manual.${fileExt}`;
@@ -169,20 +171,20 @@ export default function InventoryPage() {
       if (manualError) {
         alert("Gagal mengupload buku manual baru: " + manualError.message);
         setIsSaving(false);
-        return; // STOP!
+        return; 
       }
-
       if (data) {
         const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`manual/${fileName}`);
         manualUrl = pubUrl.publicUrl;
       }
     }
 
+    // Update data mesin utama
     const { error: updateError } = await supabase.from("machines").update({
       product_id: editFormData.product_id, 
       serial_number: editFormData.serial_number,
       nama_mesin: editFormData.nama_mesin, 
-      nama_klien: editFormData.nama_klien, // Update nama_klien
+      nama_klien: editFormData.nama_klien, 
       kategori: editFormData.kategori,
       pabrikan: editFormData.pabrikan, 
       negara_asal: editFormData.negara_asal,
@@ -196,24 +198,37 @@ export default function InventoryPage() {
     if (updateError) {
       alert("Gagal memperbarui data mesin: " + updateError.message);
       setIsSaving(false);
-      return; // STOP!
+      return;
     }
 
-    // Insert next_service kalau ada isiannya
+    // --- LOGIKA BARU: AUTO-CREATE WORK ORDER ---
     if (editFormData.next_service && !updateError) {
-      await supabase.from("machine_services").insert([{
-        machine_id: selectedMachine.id, tanggal: editFormData.next_service,
-        judul_service: "Jadwal Service Berkala (Otomatis)", pic: "Admin Profindo"
-      }]);
+      const woNumber = `WO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      
+      await supabase
+        .from("work_orders")
+        .insert([
+          {
+            wo_number: woNumber,
+            machine_id: selectedMachine.id,             // Menggunakan ID mesin yang sedang di-edit
+            jadwal_mulai: editFormData.next_service,    // Tanggal dari input Next Service
+            status: "Open",
+            judul_pekerjaan: "Servis Berkala Otomatis",
+            deskripsi: "Jadwal servis otomatis dari form edit inventory."
+          }
+        ]);
     }
 
+    // Jika semua berhasil, tampilkan animasi sukses tanpa alert()
     setIsSaving(false);
+    setIsSuccess(true); 
+    fetchMachines(); 
 
-    if (!updateError) {
-      alert("Sip! Data Mesin berhasil diperbarui.");
+    // Tutup otomatis setelah 1.5 detik
+    setTimeout(() => {
+      setIsSuccess(false);
       setIsEditModalOpen(false);
-      fetchMachines(); 
-    }
+    }, 1500);
   };
 
   const triggerDelete = () => {
@@ -222,11 +237,8 @@ export default function InventoryPage() {
     setDeleteStatus("idle");
   };
 
-  // --- LOGIKA SOFT DELETE: Ubah is_deleted jadi TRUE, bukan .delete() ---
   const executeDelete = async () => {
     setDeleteStatus("deleting");
-    
-    // Ini kuncinya: Update status, bukan Hapus permanen
     const { error } = await supabase
       .from("machines")
       .update({ is_deleted: true }) 
@@ -237,8 +249,6 @@ export default function InventoryPage() {
       setDeleteStatus("idle");
     } else {
       setDeleteStatus("success");
-      
-      // Auto Log Activity biar riwayat kecatet
       await supabase.from("activity_logs").insert([{
         actor_name: "Admin",
         action_text: `menghapus mesin ${deleteModal.nama} ke tempat sampah`,
@@ -509,245 +519,259 @@ export default function InventoryPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-[20px] shadow-2xl w-full max-w-[800px] max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 relative">
             
-            <div className="sticky top-0 bg-white z-50 px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-[18px] font-bold text-gray-900">Detail & Edit Mesin</h2>
-              <button onClick={() => setIsEditModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
-            </div>
+            {/* --- KONDISI: JIKA SUKSES MENYIMPAN --- */}
+            {isSuccess ? (
+              <div className="flex flex-col items-center justify-center py-16 animate-in zoom-in duration-300">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h3 className="text-[18px] font-bold text-gray-900">Berhasil Diperbarui!</h3>
+                <p className="text-[13px] text-gray-500 mt-2">Data mesin dan jadwal service telah disimpan.</p>
+              </div>
+            ) : (
+              /* --- KONDISI: FORM EDIT --- */
+              <>
+                <div className="sticky top-0 bg-white z-50 px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                  <h2 className="text-[18px] font-bold text-gray-900">Detail & Edit Mesin</h2>
+                  <button onClick={() => setIsEditModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  </button>
+                </div>
 
-            <form onSubmit={handleUpdate} className="p-6 relative z-10">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                
-                <div className="md:col-span-2 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700">Product ID</label>
-                      <input type="text" name="product_id" value={editFormData.product_id} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+                <form onSubmit={handleUpdate} className="p-6 relative z-10">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    
+                    <div className="md:col-span-2 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-gray-700">Product ID</label>
+                          <input type="text" name="product_id" value={editFormData.product_id} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-gray-700">Serial Number</label>
+                          <input type="text" name="serial_number" value={editFormData.serial_number} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+                        </div>
+                        
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-gray-700">Nama Mesin</label>
+                          <input type="text" name="nama_mesin" value={editFormData.nama_mesin} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+                        </div>
+                        {/* INPUT NAMA KLIEN BARU DI SINI */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-gray-700">Nama Klien / Perusahaan</label>
+                          <input type="text" name="nama_klien" placeholder="Contoh: PT. Maju Jaya" value={editFormData.nama_klien} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-[11px] font-bold text-gray-700">Kategori</label>
+                          <input type="text" name="kategori" value={editFormData.kategori} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+                        </div>
+
+                        <div className="space-y-1.5 relative z-40">
+                          <label className="text-[11px] font-bold text-gray-700">Pabrikan</label>
+                          <div className="relative flex items-center">
+                            {selectedManufacturerData && (
+                              <img src={`https://flagcdn.com/w20/${selectedManufacturerData.code}.png`} alt="flag" className="absolute left-3 w-5 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)] pointer-events-none" />
+                            )}
+                            <input 
+                              type="text" 
+                              value={editFormData.pabrikan}
+                              onChange={(e) => { setEditFormData({ ...editFormData, pabrikan: e.target.value }); setIsManufacturerOpen(true); }}
+                              onFocus={() => setIsManufacturerOpen(true)}
+                              onBlur={() => setTimeout(() => setIsManufacturerOpen(false), 200)}
+                              className={`w-full border border-gray-200 rounded-[8px] ${selectedManufacturerData ? 'pl-10' : 'pl-3'} pr-8 py-2 text-[13px] outline-none focus:border-black transition-colors bg-white`}
+                            />
+                            <svg className="absolute right-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                          </div>
+                          {isManufacturerOpen && (
+                            <div className="absolute top-full mt-1 left-0 w-full bg-white border border-gray-200 rounded-[8px] shadow-lg max-h-[160px] overflow-y-auto z-[60]">
+                              {filteredManufacturers.length > 0 ? (
+                                filteredManufacturers.map((country, idx) => (
+                                  <div 
+                                    key={idx}
+                                    onMouseDown={(e) => { e.preventDefault(); setEditFormData({ ...editFormData, pabrikan: country.name }); setIsManufacturerOpen(false); }}
+                                    className="flex items-center gap-3 px-3 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-100 hover:text-black cursor-pointer transition-colors border-b border-gray-50 last:border-0"
+                                  >
+                                    <img src={`https://flagcdn.com/w20/${country.code}.png`} alt={country.name} className="w-4 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)]" />
+                                    {country.name}
+                                  </div>
+                                ))
+                              ) : ( <div className="px-3 py-2 text-[12px] text-gray-400 text-center">Tidak ditemukan</div> )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5 relative z-30">
+                          <label className="text-[11px] font-bold text-gray-700">Negara Asal</label>
+                          <div className="relative flex items-center">
+                            {selectedCountryData && (
+                              <img src={`https://flagcdn.com/w20/${selectedCountryData.code}.png`} alt="flag" className="absolute left-3 w-5 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)] pointer-events-none" />
+                            )}
+                            <input 
+                              type="text" 
+                              value={editFormData.negara_asal}
+                              onChange={(e) => { setEditFormData({ ...editFormData, negara_asal: e.target.value }); setIsCountryOpen(true); }}
+                              onFocus={() => setIsCountryOpen(true)}
+                              onBlur={() => setTimeout(() => setIsCountryOpen(false), 200)}
+                              className={`w-full border border-gray-200 rounded-[8px] ${selectedCountryData ? 'pl-10' : 'pl-3'} pr-8 py-2 text-[13px] outline-none focus:border-black transition-colors bg-white`}
+                            />
+                            <svg className="absolute right-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                          </div>
+                          {isCountryOpen && (
+                            <div className="absolute top-full mt-1 left-0 w-full bg-white border border-gray-200 rounded-[8px] shadow-lg max-h-[160px] overflow-y-auto z-[60]">
+                              {filteredCountries.length > 0 ? (
+                                filteredCountries.map((country, idx) => (
+                                  <div 
+                                    key={idx}
+                                    onMouseDown={(e) => { e.preventDefault(); setEditFormData({ ...editFormData, negara_asal: country.name }); setIsCountryOpen(false); }}
+                                    className="flex items-center gap-3 px-3 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-100 hover:text-black cursor-pointer transition-colors border-b border-gray-50 last:border-0"
+                                  >
+                                    <img src={`https://flagcdn.com/w20/${country.code}.png`} alt={country.name} className="w-4 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)]" />
+                                    {country.name}
+                                  </div>
+                                ))
+                              ) : ( <div className="px-3 py-2 text-[12px] text-gray-400 text-center">Tidak ditemukan</div> )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-gray-700">Tgl Serah Terima</label>
+                          <input type="date" name="tanggal_serah_terima" value={editFormData.tanggal_serah_terima} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-gray-700">Tahun Pembuatan</label>
+                          <input type="text" name="tahun_pembuatan" value={editFormData.tahun_pembuatan} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-[11px] font-bold text-gray-700">Kondisi</label>
+                          <select name="kondisi" value={editFormData.kondisi} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black bg-white">
+                            <option value="Baru">Baru</option>
+                            <option value="Bekas">Bekas</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Rusak">Rusak</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-2 pt-2 mt-2 border-t border-gray-100">
+                          <label className="text-[12px] font-bold text-[#10B981] flex items-center gap-1.5">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            Atur Jadwal Next Service (Otomatis masuk ke Work Order)
+                          </label>
+                          <input 
+                            type="date" name="next_service" 
+                            value={editFormData.next_service} 
+                            onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} 
+                            className="w-full border border-green-200 bg-green-50 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-green-600 transition-colors" 
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700">Serial Number</label>
-                      <input type="text" name="serial_number" value={editFormData.serial_number} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
+
+                    {/* === KOLOM KANAN: Media & QR === */}
+                    <div className="flex flex-col border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 pl-0 md:pl-8 space-y-6">
+                      
+                      <div className="w-full relative group">
+                        <h3 className="text-[12px] font-bold text-gray-700 mb-2">Foto Mesin</h3>
+                        <div className="w-full aspect-[4/3] bg-gray-50 border border-gray-200 rounded-[12px] overflow-hidden flex items-center justify-center relative group">
+                          {editFotoFile ? (
+                            <img src={URL.createObjectURL(editFotoFile)} alt="Preview Baru" className="w-full h-full object-cover" />
+                          ) : selectedMachine.foto_mesin ? (
+                            <>
+                              <img src={selectedMachine.foto_mesin} alt="Foto Mesin" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-between p-2">
+                                <button type="button" onClick={() => handleDownloadPhoto(selectedMachine.foto_mesin, selectedMachine.product_id || "foto_mesin")} className="p-1.5 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-md text-white transition-colors" title="Download Foto">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                </button>
+                                <button type="button" onClick={() => setPreviewImage(selectedMachine.foto_mesin)} className="p-1.5 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-md text-white transition-colors" title="Lihat Penuh">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-gray-400">Belum ada foto</span>
+                          )}
+                        </div>
+                        <div className="mt-2">
+                          <label className="cursor-pointer flex items-center justify-center w-full py-1.5 border border-gray-200 text-[11px] font-bold text-gray-600 rounded-[6px] hover:bg-gray-50 transition-colors">
+                            <input type="file" className="hidden" accept="image/png, image/jpeg" onChange={(e) => e.target.files && setEditFotoFile(e.target.files[0])} />
+                            Ubah Foto Mesin
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="w-full">
+                        <h3 className="text-[12px] font-bold text-gray-700 mb-2">Buku Manual</h3>
+                        {selectedMachine.buku_manual ? (
+                          <a href={selectedMachine.buku_manual} target="_blank" rel="noreferrer" className="w-full py-2.5 bg-[#eff4ff] text-[#2D68FF] border border-[#d6e4ff] rounded-[8px] flex items-center justify-center gap-2 text-[12px] font-bold hover:bg-blue-100 transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Buka Dokumen PDF
+                          </a>
+                        ) : (
+                          <div className="w-full py-2.5 bg-gray-50 border border-gray-200 rounded-[8px] flex items-center justify-center text-[11px] text-gray-400 mb-2">
+                            Belum ada dokumen
+                          </div>
+                        )}
+                        <div className="mt-2">
+                          <label className="cursor-pointer flex items-center justify-center w-full py-1.5 border border-gray-200 text-[11px] font-bold text-gray-600 rounded-[6px] hover:bg-gray-50 transition-colors">
+                            <input type="file" className="hidden" accept=".pdf" onChange={(e) => e.target.files && setEditManualFile(e.target.files[0])} />
+                            {editManualFile ? "PDF Baru Terpilih ✔️" : "Ubah Dokumen Manual"}
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="w-full pt-4 border-t border-gray-100 flex flex-col items-center">
+                        <h3 className="text-[12px] font-bold text-gray-700 mb-3 w-full text-left">QR Code Mesin</h3>
+                        <div className="p-2 bg-gray-50 border border-gray-200 rounded-[12px] mb-2">
+                          {selectedMachine.qr_code ? (
+                            <img src={selectedMachine.qr_code} alt="QR Mesin" className="w-[110px] h-[110px] object-cover mix-blend-multiply" />
+                          ) : (
+                            <div className="w-[110px] h-[110px] flex items-center justify-center text-gray-400 text-[11px] text-center p-2">Belum ada QR</div>
+                          )}
+                        </div>
+                        {selectedMachine.qr_code && (
+                          <a href={selectedMachine.qr_code} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1">
+                            Download QR
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-gray-100">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <button 
+                        type="button" 
+                        onClick={() => router.push(`/dashboard/admin/inventory/service/${selectedMachine.id}`)}
+                        className="text-[12px] font-bold text-[#2D68FF] bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-[8px] hover:bg-blue-100 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Riwayat Service
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={triggerDelete} 
+                        className="text-[12px] font-bold text-red-600 bg-red-50 border border-red-100 px-4 py-2.5 rounded-[8px] hover:bg-red-100 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        Hapus
+                      </button>
                     </div>
                     
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700">Nama Mesin</label>
-                      <input type="text" name="nama_mesin" value={editFormData.nama_mesin} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
-                    </div>
-                    {/* INPUT NAMA KLIEN BARU DI SINI */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700">Nama Klien / Perusahaan</label>
-                      <input type="text" name="nama_klien" placeholder="Contoh: PT. Maju Jaya" value={editFormData.nama_klien} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
-                    </div>
-
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-[11px] font-bold text-gray-700">Kategori</label>
-                      <input type="text" name="kategori" value={editFormData.kategori} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
-                    </div>
-
-                    <div className="space-y-1.5 relative z-40">
-                      <label className="text-[11px] font-bold text-gray-700">Pabrikan</label>
-                      <div className="relative flex items-center">
-                        {selectedManufacturerData && (
-                          <img src={`https://flagcdn.com/w20/${selectedManufacturerData.code}.png`} alt="flag" className="absolute left-3 w-5 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)] pointer-events-none" />
-                        )}
-                        <input 
-                          type="text" 
-                          value={editFormData.pabrikan}
-                          onChange={(e) => { setEditFormData({ ...editFormData, pabrikan: e.target.value }); setIsManufacturerOpen(true); }}
-                          onFocus={() => setIsManufacturerOpen(true)}
-                          onBlur={() => setTimeout(() => setIsManufacturerOpen(false), 200)}
-                          className={`w-full border border-gray-200 rounded-[8px] ${selectedManufacturerData ? 'pl-10' : 'pl-3'} pr-8 py-2 text-[13px] outline-none focus:border-black transition-colors bg-white`}
-                        />
-                        <svg className="absolute right-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                      </div>
-                      {isManufacturerOpen && (
-                        <div className="absolute top-full mt-1 left-0 w-full bg-white border border-gray-200 rounded-[8px] shadow-lg max-h-[160px] overflow-y-auto z-[60]">
-                          {filteredManufacturers.length > 0 ? (
-                            filteredManufacturers.map((country, idx) => (
-                              <div 
-                                key={idx}
-                                onMouseDown={(e) => { e.preventDefault(); setEditFormData({ ...editFormData, pabrikan: country.name }); setIsManufacturerOpen(false); }}
-                                className="flex items-center gap-3 px-3 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-100 hover:text-black cursor-pointer transition-colors border-b border-gray-50 last:border-0"
-                              >
-                                <img src={`https://flagcdn.com/w20/${country.code}.png`} alt={country.name} className="w-4 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)]" />
-                                {country.name}
-                              </div>
-                            ))
-                          ) : ( <div className="px-3 py-2 text-[12px] text-gray-400 text-center">Tidak ditemukan</div> )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-1.5 relative z-30">
-                      <label className="text-[11px] font-bold text-gray-700">Negara Asal</label>
-                      <div className="relative flex items-center">
-                        {selectedCountryData && (
-                          <img src={`https://flagcdn.com/w20/${selectedCountryData.code}.png`} alt="flag" className="absolute left-3 w-5 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)] pointer-events-none" />
-                        )}
-                        <input 
-                          type="text" 
-                          value={editFormData.negara_asal}
-                          onChange={(e) => { setEditFormData({ ...editFormData, negara_asal: e.target.value }); setIsCountryOpen(true); }}
-                          onFocus={() => setIsCountryOpen(true)}
-                          onBlur={() => setTimeout(() => setIsCountryOpen(false), 200)}
-                          className={`w-full border border-gray-200 rounded-[8px] ${selectedCountryData ? 'pl-10' : 'pl-3'} pr-8 py-2 text-[13px] outline-none focus:border-black transition-colors bg-white`}
-                        />
-                        <svg className="absolute right-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                      </div>
-                      {isCountryOpen && (
-                        <div className="absolute top-full mt-1 left-0 w-full bg-white border border-gray-200 rounded-[8px] shadow-lg max-h-[160px] overflow-y-auto z-[60]">
-                          {filteredCountries.length > 0 ? (
-                            filteredCountries.map((country, idx) => (
-                              <div 
-                                key={idx}
-                                onMouseDown={(e) => { e.preventDefault(); setEditFormData({ ...editFormData, negara_asal: country.name }); setIsCountryOpen(false); }}
-                                className="flex items-center gap-3 px-3 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-100 hover:text-black cursor-pointer transition-colors border-b border-gray-50 last:border-0"
-                              >
-                                <img src={`https://flagcdn.com/w20/${country.code}.png`} alt={country.name} className="w-4 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)]" />
-                                {country.name}
-                              </div>
-                            ))
-                          ) : ( <div className="px-3 py-2 text-[12px] text-gray-400 text-center">Tidak ditemukan</div> )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700">Tgl Serah Terima</label>
-                      <input type="date" name="tanggal_serah_terima" value={editFormData.tanggal_serah_terima} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700">Tahun Pembuatan</label>
-                      <input type="text" name="tahun_pembuatan" value={editFormData.tahun_pembuatan} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
-                    </div>
-
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-[11px] font-bold text-gray-700">Kondisi</label>
-                      <select name="kondisi" value={editFormData.kondisi} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black bg-white">
-                        <option value="Baru">Baru</option>
-                        <option value="Bekas">Bekas</option>
-                        <option value="Maintenance">Maintenance</option>
-                        <option value="Rusak">Rusak</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5 sm:col-span-2 pt-2 mt-2 border-t border-gray-100">
-                      <label className="text-[12px] font-bold text-[#10B981] flex items-center gap-1.5">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        Atur Jadwal Next Service (Otomatis masuk ke Riwayat)
-                      </label>
-                      <input 
-                        type="date" name="next_service" 
-                        value={editFormData.next_service} 
-                        onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} 
-                        className="w-full border border-green-200 bg-green-50 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-green-600 transition-colors" 
-                      />
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                      <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-5 py-2.5 text-[12px] font-bold text-gray-600 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition-colors">
+                        Batal
+                      </button>
+                      <button type="submit" disabled={isSaving} className={`px-5 py-2.5 text-[12px] font-bold text-white bg-black rounded-[8px] hover:bg-gray-800 transition-colors flex items-center gap-2 ${isSaving ? 'opacity-70' : ''}`}>
+                        {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                {/* === KOLOM KANAN: Media & QR === */}
-                <div className="flex flex-col border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 pl-0 md:pl-8 space-y-6">
-                  
-                  <div className="w-full relative group">
-                    <h3 className="text-[12px] font-bold text-gray-700 mb-2">Foto Mesin</h3>
-                    <div className="w-full aspect-[4/3] bg-gray-50 border border-gray-200 rounded-[12px] overflow-hidden flex items-center justify-center relative group">
-                      {editFotoFile ? (
-                        <img src={URL.createObjectURL(editFotoFile)} alt="Preview Baru" className="w-full h-full object-cover" />
-                      ) : selectedMachine.foto_mesin ? (
-                        <>
-                          <img src={selectedMachine.foto_mesin} alt="Foto Mesin" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-between p-2">
-                            <button type="button" onClick={() => handleDownloadPhoto(selectedMachine.foto_mesin, selectedMachine.product_id || "foto_mesin")} className="p-1.5 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-md text-white transition-colors" title="Download Foto">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            </button>
-                            <button type="button" onClick={() => setPreviewImage(selectedMachine.foto_mesin)} className="p-1.5 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-md text-white transition-colors" title="Lihat Penuh">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-[11px] text-gray-400">Belum ada foto</span>
-                      )}
-                    </div>
-                    <div className="mt-2">
-                      <label className="cursor-pointer flex items-center justify-center w-full py-1.5 border border-gray-200 text-[11px] font-bold text-gray-600 rounded-[6px] hover:bg-gray-50 transition-colors">
-                        <input type="file" className="hidden" accept="image/png, image/jpeg" onChange={(e) => e.target.files && setEditFotoFile(e.target.files[0])} />
-                        Ubah Foto Mesin
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="w-full">
-                    <h3 className="text-[12px] font-bold text-gray-700 mb-2">Buku Manual</h3>
-                    {selectedMachine.buku_manual ? (
-                      <a href={selectedMachine.buku_manual} target="_blank" rel="noreferrer" className="w-full py-2.5 bg-[#eff4ff] text-[#2D68FF] border border-[#d6e4ff] rounded-[8px] flex items-center justify-center gap-2 text-[12px] font-bold hover:bg-blue-100 transition-colors">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        Buka Dokumen PDF
-                      </a>
-                    ) : (
-                      <div className="w-full py-2.5 bg-gray-50 border border-gray-200 rounded-[8px] flex items-center justify-center text-[11px] text-gray-400 mb-2">
-                        Belum ada dokumen
-                      </div>
-                    )}
-                    <div className="mt-2">
-                      <label className="cursor-pointer flex items-center justify-center w-full py-1.5 border border-gray-200 text-[11px] font-bold text-gray-600 rounded-[6px] hover:bg-gray-50 transition-colors">
-                        <input type="file" className="hidden" accept=".pdf" onChange={(e) => e.target.files && setEditManualFile(e.target.files[0])} />
-                        {editManualFile ? "PDF Baru Terpilih ✔️" : "Ubah Dokumen Manual"}
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="w-full pt-4 border-t border-gray-100 flex flex-col items-center">
-                    <h3 className="text-[12px] font-bold text-gray-700 mb-3 w-full text-left">QR Code Mesin</h3>
-                    <div className="p-2 bg-gray-50 border border-gray-200 rounded-[12px] mb-2">
-                      {selectedMachine.qr_code ? (
-                        <img src={selectedMachine.qr_code} alt="QR Mesin" className="w-[110px] h-[110px] object-cover mix-blend-multiply" />
-                      ) : (
-                        <div className="w-[110px] h-[110px] flex items-center justify-center text-gray-400 text-[11px] text-center p-2">Belum ada QR</div>
-                      )}
-                    </div>
-                    {selectedMachine.qr_code && (
-                      <a href={selectedMachine.qr_code} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1">
-                        Download QR
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-gray-100">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <button 
-                    type="button" 
-                    onClick={() => router.push(`/dashboard/admin/inventory/service/${selectedMachine.id}`)}
-                    className="text-[12px] font-bold text-[#2D68FF] bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-[8px] hover:bg-blue-100 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Riwayat Service
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={triggerDelete} 
-                    className="text-[12px] font-bold text-red-600 bg-red-50 border border-red-100 px-4 py-2.5 rounded-[8px] hover:bg-red-100 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    Hapus
-                  </button>
-                </div>
-                
-                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-5 py-2.5 text-[12px] font-bold text-gray-600 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition-colors">
-                    Batal
-                  </button>
-                  <button type="submit" disabled={isSaving} className={`px-5 py-2.5 text-[12px] font-bold text-white bg-black rounded-[8px] hover:bg-gray-800 transition-colors flex items-center gap-2 ${isSaving ? 'opacity-70' : ''}`}>
-                    {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
-                  </button>
-                </div>
-              </div>
-            </form>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}

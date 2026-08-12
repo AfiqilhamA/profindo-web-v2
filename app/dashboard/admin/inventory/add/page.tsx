@@ -93,6 +93,7 @@ export default function AddMachinePage() {
   const [formData, setFormData] = useState({
     serial_number: "",
     nama_mesin: "",
+    nama_klien: "", // --- TAMBAHAN KOLOM NAMA KLIEN ---
     kategori: "",
     tahun_pembuatan: "",
     kondisi: "",
@@ -189,7 +190,6 @@ export default function AddMachinePage() {
     let fotoUrl = null;
     let manualUrl = null;
 
-    // --- PENJAGA PINTU 1: CEK ERROR UPLOAD FOTO ---
     if (fotoFile) {
       const fileExt = fotoFile.name.split('.').pop();
       const fileName = `${Date.now()}-foto.${fileExt}`;
@@ -198,7 +198,7 @@ export default function AddMachinePage() {
       if (fotoError) {
         alert("Gagal mengupload foto mesin: " + fotoError.message);
         setSubmitModal({ isOpen: false, status: "confirm" });
-        return; // Stop di sini, jangan lanjut!
+        return; 
       }
       if (fotoData) {
         const { data: publicUrlData } = supabase.storage.from('machine_files').getPublicUrl(`foto/${fileName}`);
@@ -206,7 +206,6 @@ export default function AddMachinePage() {
       }
     }
 
-    // --- PENJAGA PINTU 2: CEK ERROR UPLOAD MANUAL ---
     if (manualFile) {
       const fileExt = manualFile.name.split('.').pop();
       const fileName = `${Date.now()}-manual.${fileExt}`;
@@ -215,7 +214,7 @@ export default function AddMachinePage() {
       if (manualError) {
         alert("Gagal mengupload buku manual: " + manualError.message);
         setSubmitModal({ isOpen: false, status: "confirm" });
-        return; // Stop di sini, jangan lanjut!
+        return; 
       }
       if (manualData) {
         const { data: publicUrlData } = supabase.storage.from('machine_files').getPublicUrl(`manual/${fileName}`);
@@ -232,6 +231,7 @@ export default function AddMachinePage() {
           product_id: finalProductId,
           serial_number: formData.serial_number,
           nama_mesin: formData.nama_mesin,
+          nama_klien: formData.nama_klien, // Simpan Nama Klien ke database
           kategori: formData.kategori,
           pabrikan: manufacturerQuery,
           negara_asal: countryQuery, 
@@ -307,8 +307,14 @@ export default function AddMachinePage() {
               <label className="text-[12px] font-bold text-gray-700">Nama Mesin</label>
               <input type="text" name="nama_mesin" required value={formData.nama_mesin} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
             </div>
-            
+
+            {/* --- FITUR BARU: INPUT NAMA KLIEN (OPSIONAL) --- */}
             <div className="space-y-1.5">
+              <label className="text-[12px] font-bold text-gray-700">Nama Klien / Perusahaan <span className="text-gray-400 font-normal">(Opsional)</span></label>
+              <input type="text" name="nama_klien" placeholder="Contoh: PT. Maju Jaya" value={formData.nama_klien} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
+            </div>
+            
+            <div className="space-y-1.5 sm:col-span-2">
               <label className="text-[12px] font-bold text-gray-700">Kategori</label>
               <input type="text" name="kategori" value={formData.kategori} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
             </div>
@@ -393,7 +399,7 @@ export default function AddMachinePage() {
               <input type="text" name="tahun_pembuatan" value={formData.tahun_pembuatan} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
             </div>
             
-            <div className="space-y-1.5 relative">
+            <div className="space-y-1.5 sm:col-span-2 relative">
               <label className="text-[12px] font-bold text-gray-700">Kondisi</label>
               <select name="kondisi" value={formData.kondisi} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors appearance-none bg-white">
                 <option value=""></option>
@@ -402,6 +408,7 @@ export default function AddMachinePage() {
               </select>
               <svg className="absolute right-3 top-[34px] w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
+
           </div>
         </div>
 

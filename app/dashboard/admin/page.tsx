@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../../utils/supabase";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow, format, differenceInDays, isBefore, isAfter, startOfDay } from "date-fns";
 import { enUS } from "date-fns/locale"; 
 
 export default function AdminDashboardPage() {
@@ -36,11 +36,12 @@ export default function AdminDashboardPage() {
         totalActive: openCount + inProgressCount,
       });
 
-      // Tarik data WO, pastikan bawa jadwal_selesai buat ngitung deadline
+      // Tarik data WO, pastikan bawa jadwal_mulai DAN jadwal_selesai
       const { data: upcomingData } = await supabase
         .from("work_orders")
         .select(`
           id, 
+          jadwal_mulai,
           jadwal_selesai, 
           nama_klien,
           machines (nama_klien, kategori, nama_mesin)
@@ -117,8 +118,59 @@ export default function AdminDashboardPage() {
                   <p className="text-[13px] text-gray-400 font-medium h-full flex items-center">Tidak ada jadwal servis yang aktif.</p>
                 ) : (
                   upcomingServices.map((wo, index) => {
-                    // SEKARANG NGITUNGNYA BERDASARKAN TENGGAT WAKTU (jadwal_selesai)
-                    const daysLeft = wo.jadwal_selesai ? Math.ceil((new Date(wo.jadwal_selesai).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : 0;
+                    const today = startOfDay(new Date());
+                    
+                    // Cek ketersediaan tanggal
+                    const jadwalMulaiStr = wo.jadwal_mulai; 
+                    const jadwalSelesaiStr = wo.jadwal_selesai;
+
+                    let statusBadge = null;
+
+                    if (!jadwalSelesaiStr) {
+                      statusBadge = (
+                        <div className="bg-gray-50 border border-gray-200 text-gray-500 px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ml-4">
+                          Tanpa Tenggat
+                        </div>
+                      );
+                    } else {
+                      const startDate = jadwalMulaiStr ? startOfDay(new Date(jadwalMulaiStr)) : null;
+                      const endDate = startOfDay(new Date(jadwalSelesaiStr));
+
+                      // 1. Jika hari ini belum sampai jadwal mulai -> Hitung "Upcoming in X days"
+                      if (startDate && isBefore(today, startDate)) {
+                        const daysUntilStart = differenceInDays(startDate, today);
+                        statusBadge = (
+                          <div className="bg-blue-50 border border-blue-100 text-blue-600 px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ml-4">
+                            Upcoming in {daysUntilStart} {daysUntilStart === 1 ? 'day' : 'days'}
+                          </div>
+                        );
+                      } 
+                      // 2. Jika hari ini melewati batas tenggat -> "Tenggat Habis"
+                      else if (isAfter(today, endDate)) {
+                         statusBadge = (
+                          <div className="bg-red-50 border border-red-100 text-red-600 px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ml-4">
+                            Tenggat Habis / Hari Ini
+                          </div>
+                        );
+                      }
+                      // 3. Jika hari ini berada di antara jadwal mulai dan tenggat -> "X Days Left"
+                      else {
+                         const daysLeft = differenceInDays(endDate, today);
+                         if(daysLeft === 0) {
+                             statusBadge = (
+                                <div className="bg-red-50 border border-red-100 text-red-600 px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ml-4">
+                                  Tenggat Habis / Hari Ini
+                                </div>
+                              );
+                         } else {
+                             statusBadge = (
+                                <div className="bg-[#FFF7ED] border border-[#FFEDD5] text-[#EA580C] px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ml-4">
+                                  {daysLeft} days Left
+                                </div>
+                              );
+                         }
+                      }
+                    }
                     
                     const displayedNamaKlien = wo.nama_klien || wo.machines?.nama_klien || "Nama Klien Belum Diatur";
                     const displayedMesin = wo.machines?.kategori || wo.machines?.nama_mesin || "Servis Umum";
@@ -128,19 +180,10 @@ export default function AdminDashboardPage() {
                         <div>
                           <p className="text-[14px] font-bold text-gray-900">{displayedNamaKlien}</p>
                           <p className="text-[12px] font-medium text-gray-400 mt-0.5">
-                            {displayedMesin} • Tenggat: {wo.jadwal_selesai ? format(new Date(wo.jadwal_selesai), "dd MMM yyyy") : "Belum diatur"}
+                            {displayedMesin} • Tenggat: {jadwalSelesaiStr ? format(new Date(jadwalSelesaiStr), "dd MMM yyyy") : "Belum diatur"}
                           </p>
                         </div>
-                        
-                        {daysLeft > 0 ? (
-                          <div className="bg-[#FFF7ED] border border-[#FFEDD5] text-[#EA580C] px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ml-4">
-                            {daysLeft} days Left
-                          </div>
-                        ) : (
-                          <div className="bg-red-50 border border-red-100 text-red-600 px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ml-4">
-                            Tenggat Habis / Hari Ini
-                          </div>
-                        )}
+                        {statusBadge}
                       </div>
                     );
                   })
