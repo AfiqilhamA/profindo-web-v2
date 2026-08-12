@@ -220,7 +220,12 @@ export default function InventoryPage() {
 
       if (workOrderError) {
         alert("Data mesin tersimpan, tetapi gagal membuat work order: " + workOrderError.message);
+        await fetchMachines();
+        setEditFotoFile(null);
+        setEditManualFile(null);
+        setIsSuccess(false);
         setIsSaving(false);
+        setIsEditModalOpen(false);
         return;
       }
     }
