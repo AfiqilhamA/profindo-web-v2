@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../../utils/supabase";
+import { generateUniqueWoNumber } from "../../../../utils/woNumber";
 
 export default function WorkOrdersPage() {
   const [workOrders, setWorkOrders] = useState<any[]>([]);
@@ -66,11 +67,12 @@ export default function WorkOrdersPage() {
     setIsLoading(false);
   };
 
-  const handleOpenAdd = () => {
+  const handleOpenAdd = async () => {
     setModalMode("add");
     setSelectedWo(null);
+    const woNumber = await generateUniqueWoNumber();
     setFormData({
-      wo_number: `WO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`, 
+      wo_number: woNumber, 
       nama_klien: "",
       machine_id: "", technician_id: "", judul_pekerjaan: "", deskripsi: "",
       priority: "Medium", status: "Open", jadwal_mulai: "", jadwal_selesai: ""
