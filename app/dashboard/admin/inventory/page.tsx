@@ -205,7 +205,7 @@ export default function InventoryPage() {
     if (editFormData.next_service && !updateError) {
       const woNumber = `WO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
       
-      await supabase
+      const { error: workOrderError } = await supabase
         .from("work_orders")
         .insert([
           {
@@ -217,6 +217,17 @@ export default function InventoryPage() {
             deskripsi: "Jadwal servis otomatis dari form edit inventory."
           }
         ]);
+
+      if (workOrderError) {
+        alert("Data mesin tersimpan, tetapi gagal membuat work order: " + workOrderError.message);
+        await fetchMachines();
+        setEditFotoFile(null);
+        setEditManualFile(null);
+        setIsSuccess(false);
+        setIsSaving(false);
+        setIsEditModalOpen(false);
+        return;
+      }
     }
 
     // Jika semua berhasil, tampilkan animasi sukses tanpa alert()
