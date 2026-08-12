@@ -35,15 +35,26 @@ export async function proxy(request: NextRequest) {
       .eq("email", user.email ?? "")
       .maybeSingle();
 
-    const role = profile?.role?.toLowerCase() ?? "";
-    if (profile?.is_deleted || (isDashboard && !role.includes("admin")) || (isTechnician && role.includes("admin"))) {
+    if (!profile || profile.is_deleted) {
+      const signOutResponse = NextResponse.redirect(new URL("/login", request.url));
+      request.cookies.getAll().forEach(({ name }) => signOutResponse.cookies.set(name, "", { maxAge: 0, path: "/" }));
+      return signOutResponse;
+    }
+
+    const role = profile.role?.toLowerCase() ?? "";
+    if ((isDashboard && !role.includes("admin")) || (isTechnician && role.includes("admin"))) {
       return NextResponse.redirect(new URL(role.includes("admin") ? "/dashboard/admin" : "/technician", request.url));
     }
   }
 
   if (path === "/login" && user) {
-    const { data: profile } = await supabase.from("technicians").select("role").eq("email", user.email ?? "").maybeSingle();
-    return NextResponse.redirect(new URL(profile?.role?.toLowerCase().includes("admin") ? "/dashboard/admin" : "/technician", request.url));
+    const { data: profile } = await supabase.from("technicians").select("role, is_deleted").eq("email", user.email ?? "").maybeSingle();
+    if (!profile || profile.is_deleted) {
+      const signOutResponse = NextResponse.redirect(new URL("/login", request.url));
+      request.cookies.getAll().forEach(({ name }) => signOutResponse.cookies.set(name, "", { maxAge: 0, path: "/" }));
+      return signOutResponse;
+    }
+    return NextResponse.redirect(new URL(profile.role?.toLowerCase().includes("admin") ? "/dashboard/admin" : "/technician", request.url));
   }
 
   return response;

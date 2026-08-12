@@ -38,13 +38,44 @@ create policy work_orders_technician_update on public.work_orders for update to 
 
 create policy activity_logs_admin_read on public.activity_logs for select to authenticated
   using (public.is_admin());
+create or replace function public.is_current_actor(actor_name text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.technicians t
+    where lower(t.email) = lower(auth.email())
+      and coalesce(t.is_deleted, false) = false
+      and t.nama_lengkap = actor_name
+  );
+$$;
+
 create policy activity_logs_authenticated_insert on public.activity_logs for insert to authenticated
-  with check (true);
+  with check (public.is_admin() or public.is_current_actor(actor_name));
 
 create policy machine_services_read on public.machine_services for select to authenticated
-  using (public.is_admin() or exists (select 1 from public.work_orders w where w.machine_id = machine_services.machine_id and w.technician_id = auth.uid()));
+  using (
+    public.is_admin()
+    or exists (
+      select 1
+      from public.work_orders w
+      join public.technicians t on t.id = w.technician_id
+      where w.machine_id = machine_services.machine_id
+        and lower(t.email) = lower(auth.email())
+        and coalesce(t.is_deleted, false) = false
+    )
+  );
 create policy machine_services_write on public.machine_services for insert to authenticated
-  with check (true);
+  with check (
+    public.is_admin()
+    or exists (
+      select 1
+      from public.work_orders w
+      join public.technicians t on t.id = w.technician_id
+      where w.machine_id = machine_services.machine_id
+        and lower(t.email) = lower(auth.email())
+        and coalesce(t.is_deleted, false) = false
+        and w.status in ('Open', 'In Progress')
+    )
+  );
 create policy machine_services_admin_update on public.machine_services for update to authenticated
   using (public.is_admin()) with check (public.is_admin());
 create policy machine_services_admin_delete on public.machine_services for delete to authenticated

@@ -48,13 +48,13 @@ export default function LoginPage() {
       const isActuallyAdmin = userRoleLower.includes("admin");
       
       if (activeTab === "admin" && !isActuallyAdmin) {
+        await supabase.auth.signOut();
         setErrorMsg("Akun ini bukan Admin! Silakan login lewat tab Technician.");
-        setIsLoading(false);
         return;
       }
       if (activeTab === "technician" && isActuallyAdmin) {
+        await supabase.auth.signOut();
         setErrorMsg("Akun ini adalah Admin! Silakan login lewat tab Admin.");
-        setIsLoading(false);
         return;
       }
 
