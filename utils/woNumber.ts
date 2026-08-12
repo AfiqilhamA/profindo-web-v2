@@ -16,34 +16,8 @@ export async function generateUniqueWoNumber(): Promise<string> {
     .order("wo_number", { ascending: false })
     .limit(1);
 
-  let nextSeq = 1;
-
-  if (!error && data && data.length > 0) {
-    const lastWo = data[0].wo_number;
-    const parts = lastWo.split("-");
-    const lastNum = parseInt(parts[parts.length - 1], 10);
-    if (!isNaN(lastNum)) {
-      nextSeq = lastNum + 1;
-    }
-  }
-
-  // Attempt to generate unique candidate with up to 5 retries in case of concurrent inserts
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const seqStr = String(nextSeq + attempt).padStart(4, "0");
-    const candidate = `${prefix}${seqStr}`;
-
-    const { data: existing } = await supabase
-      .from("work_orders")
-      .select("id")
-      .eq("wo_number", candidate)
-      .maybeSingle();
-
-    if (!existing) {
-      return candidate;
-    }
-  }
-
-  // Fallback to timestamp + random suffix if retries exhausted
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  return `${prefix}${Date.now().toString().slice(-4)}${randomSuffix}`;
+  if (error) throw new Error("Gagal membaca nomor work order.");
+  const last = data?.[0]?.wo_number?.split("-").pop();
+  const nextSeq = Number.parseInt(last ?? "0", 10) + 1;
+  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
 }

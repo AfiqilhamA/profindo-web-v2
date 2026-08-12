@@ -1,4 +1,4 @@
-import { UserProfile } from "../types";
+import { supabase } from "./supabase";
 
 export interface SessionUser {
   id: string;
@@ -10,38 +10,23 @@ export interface SessionUser {
   isGuest: boolean;
 }
 
-export function getCurrentSessionUser(): SessionUser | null {
-  if (typeof window === "undefined") return null;
-
-  const userName = localStorage.getItem("user_name");
-  const userRole = localStorage.getItem("user_role");
-  const userId = localStorage.getItem("user_id") || "";
-  const avatar = localStorage.getItem("admin_avatar") || undefined;
-
-  if (!userName || !userRole) {
-    return null;
-  }
-
-  const roleLower = userRole.toLowerCase();
-  const isAdmin = roleLower.includes("admin");
-  const isGuest = roleLower.includes("guest");
-  const isTechnician = !isAdmin && !isGuest;
-
+export async function getCurrentSessionUser(): Promise<SessionUser | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase.from("technicians").select("id, nama_lengkap, role, foto_profil").eq("email", user.email ?? "").maybeSingle();
+  if (!profile) return null;
+  const roleLower = profile.role.toLowerCase();
   return {
-    id: userId,
-    name: userName,
-    role: userRole,
-    avatar,
-    isAdmin,
-    isTechnician,
-    isGuest
+    id: profile.id,
+    name: profile.nama_lengkap,
+    role: profile.role,
+    avatar: profile.foto_profil,
+    isAdmin: roleLower.includes("admin"),
+    isTechnician: !roleLower.includes("admin") && !roleLower.includes("guest"),
+    isGuest: roleLower.includes("guest"),
   };
 }
 
-export function clearSessionUser(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem("user_name");
-  localStorage.removeItem("user_role");
-  localStorage.removeItem("user_id");
-  localStorage.removeItem("admin_avatar");
+export async function clearSessionUser(): Promise<void> {
+  await supabase.auth.signOut();
 }

@@ -19,10 +19,6 @@ export default function TechnicianFormPage() {
   const [fotoFile, setFotoFile] = useState<File | null>(null);
 
   useEffect(() => {
-    // Ambil nama teknisi dari local storage (SUDAH DIPERBAIKI JADI user_name)
-    const savedName = localStorage.getItem("user_name") || "Ranel";
-    setTechName(savedName);
-
     const fetchMachine = async () => {
       const decodedId = decodeURIComponent(productId);
       const { data } = await supabase
@@ -34,8 +30,13 @@ export default function TechnicianFormPage() {
       if (data) setMachine(data);
       setIsLoading(false);
     };
-    fetchMachine();
-  }, [productId]);
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return router.push("/login");
+      const { data: profile } = await supabase.from("technicians").select("nama_lengkap").eq("email", user.email ?? "").maybeSingle();
+      if (profile) setTechName(profile.nama_lengkap);
+      fetchMachine();
+    });
+  }, [productId, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

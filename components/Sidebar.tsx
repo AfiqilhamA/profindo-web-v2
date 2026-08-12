@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { supabase } from "../utils/supabase";
 
 interface SidebarProps {
   isSidebarOpen: boolean;
@@ -20,14 +21,12 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
   const [activeUserRole, setActiveUserRole] = useState("");
 
   useEffect(() => {
-    const savedName = localStorage.getItem("user_name");
-    const savedRole = localStorage.getItem("user_role");
-
-    if (savedName) setActiveUserName(savedName);
-    else setActiveUserName("Admin Sistem"); 
-
-    if (savedRole) setActiveUserRole(savedRole);
-    else setActiveUserRole("Admin"); 
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await supabase.from("technicians").select("nama_lengkap, role").eq("email", user.email ?? "").maybeSingle();
+      if (profile?.nama_lengkap) setActiveUserName(profile.nama_lengkap);
+      if (profile?.role) setActiveUserRole(profile.role);
+    });
   }, []);
 
   const menuItems = [
@@ -45,12 +44,9 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
   };
 
   // Fungsi Eksekusi Logout beneran
-  const confirmLogout = () => {
-    localStorage.removeItem("user_name");
-    localStorage.removeItem("user_role");
-    localStorage.removeItem("user_id");
-    localStorage.removeItem("admin_avatar");
-    router.push("/login"); // Disesuaikan: panggil "/login" atau "/" sesuai route login lu
+  const confirmLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
   };
 
   const getInitials = (name: string) => {

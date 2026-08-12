@@ -171,7 +171,14 @@ export default function InventoryPage() {
 
     // --- LOGIKA BARU: AUTO-CREATE WORK ORDER ---
     if (editFormData.next_service && !updateError) {
-      const woNumber = await generateUniqueWoNumber();
+      let woNumber: string;
+      try {
+        woNumber = await generateUniqueWoNumber();
+      } catch {
+        alert("Data mesin tersimpan, tetapi nomor work order gagal dibuat.");
+        setIsSaving(false);
+        return;
+      }
       
       const { error: workOrderError } = await supabase
         .from("work_orders")
@@ -187,7 +194,7 @@ export default function InventoryPage() {
         ]);
 
       if (workOrderError) {
-        alert("Data mesin tersimpan, tetapi gagal membuat work order: " + workOrderError.message);
+        alert("Data mesin tersimpan, tetapi gagal membuat work order. Silakan coba lagi.");
         await fetchMachines();
         setEditFotoFile(null);
         setEditManualFile(null);

@@ -30,12 +30,11 @@ export default function TechnicianPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const name = localStorage.getItem("user_name");
-    if (name) setTechName(name);
-
-    if (!localStorage.getItem("user_role")) {
-      router.push("/login");
-    }
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return router.push("/login");
+      const { data: profile } = await supabase.from("technicians").select("nama_lengkap").eq("email", user.email ?? "").maybeSingle();
+      if (profile) setTechName(profile.nama_lengkap);
+    });
   }, [router]);
 
   // ==========================================
@@ -75,8 +74,8 @@ export default function TechnicianPage() {
     };
   }, [appState]);
 
-  const confirmLogout = () => {
-    localStorage.clear();
+  const confirmLogout = async () => {
+    await supabase.auth.signOut();
     router.push("/login");
   };
 

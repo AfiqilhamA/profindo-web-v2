@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { supabase } from "../utils/supabase";
 
 // 1. TAMBAHIN INTERFACE INI BIAR TYPESCRIPT NGGAK NGAMBEK
 interface TopbarProps {
@@ -32,11 +33,12 @@ export default function Topbar({ setIsSidebarOpen }: TopbarProps) {
       setCurrentTime(timeString);
     }, 1000);
 
-    const savedAvatar = localStorage.getItem("admin_avatar");
-    if (savedAvatar) setAvatarUrl(savedAvatar);
-
-    const savedName = localStorage.getItem("user_name");
-    if (savedName) setActiveUserName(savedName);
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await supabase.from("technicians").select("nama_lengkap, foto_profil").eq("email", user.email ?? "").maybeSingle();
+      if (profile?.foto_profil) setAvatarUrl(profile.foto_profil);
+      if (profile?.nama_lengkap) setActiveUserName(profile.nama_lengkap);
+    });
 
     return () => clearInterval(timer);
   }, []);

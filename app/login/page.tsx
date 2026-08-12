@@ -18,22 +18,12 @@ export default function LoginPage() {
   // FITUR: SATPAM SESI (DIUPDATE BUAT GUEST)
   // ==========================================
   useEffect(() => {
-    const activeUser = localStorage.getItem("user_name");
-    const activeRole = localStorage.getItem("user_role");
-    
-    if (activeUser) {
-      if (activeRole === "Guest") {
-        // JIKA GUEST MENEKAN TOMBOL BACK (UNDO) KE HALAMAN LOGIN:
-        // Kita langsung hapus sesi Guest-nya secara otomatis biar dia beneran Logout!
-        localStorage.removeItem("user_name");
-        localStorage.removeItem("user_role");
-        localStorage.removeItem("admin_avatar");
-      } else if (activeRole === "Admin") {
-        router.push("/dashboard/admin");
-      } else {
-        router.push("/technician"); 
-      }
-    }
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await supabase.from("technicians").select("role").eq("email", user.email ?? "").maybeSingle();
+      if (profile?.role?.toLowerCase().includes("admin")) router.push("/dashboard/admin");
+      else if (profile) router.push("/technician");
+    });
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -42,20 +32,18 @@ export default function LoginPage() {
     setErrorMsg("");
 
     try {
-      const { data, error } = await supabase
-        .from("technicians")
-        .select("*")
-        .eq("email", email)
-        .eq("password", password)
-        .eq("is_deleted", false) 
-        .maybeSingle(); 
-
-      if (error || !data) {
-        setErrorMsg("Email atau Password salah!");
-        setIsLoading(false);
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setErrorMsg(result.error || "Email atau Password salah!");
         return;
       }
 
+      const data = result;
       const userRoleLower = (data.role || "").toLowerCase();
       const isActuallyAdmin = userRoleLower.includes("admin");
       
@@ -68,16 +56,6 @@ export default function LoginPage() {
         setErrorMsg("Akun ini adalah Admin! Silakan login lewat tab Admin.");
         setIsLoading(false);
         return;
-      }
-
-      localStorage.setItem("user_name", data.nama_lengkap);
-      localStorage.setItem("user_role", data.role);
-      localStorage.setItem("user_id", data.id);
-      
-      if (data.foto_profil) {
-        localStorage.setItem("admin_avatar", data.foto_profil);
-      } else {
-        localStorage.removeItem("admin_avatar");
       }
 
       if (isActuallyAdmin) {
@@ -94,12 +72,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleGuestLogin = () => {
-    localStorage.setItem("user_name", "Guest / Pelanggan");
-    localStorage.setItem("user_role", "Guest"); 
-    localStorage.removeItem("admin_avatar");
-    router.push("/guest");
-  };
+  const handleGuestLogin = () => router.push("/guest");
 
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center overflow-hidden bg-[#F4F5F7]">

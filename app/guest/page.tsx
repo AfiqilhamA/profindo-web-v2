@@ -26,13 +26,7 @@ export default function GuestPage() {
   // LOGIKA LIVE KAMERA
   // ==========================================
   useEffect(() => {
-    if (localStorage.getItem("user_role") !== "Guest") {
-      router.push("/login");
-    }
-
     const handlePopState = () => {
-      localStorage.removeItem("user_name");
-      localStorage.removeItem("user_role");
       router.replace("/login");
     };
     window.addEventListener('popstate', handlePopState);
@@ -154,8 +148,6 @@ export default function GuestPage() {
 
   // Fungsi Keluar Langsung (Instant Logout)
   const handleLogout = () => {
-    localStorage.removeItem("user_name");
-    localStorage.removeItem("user_role");
     router.push("/login");
   };
 
