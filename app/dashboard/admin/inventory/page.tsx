@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../utils/supabase";
 
-// --- DATA NEGARA (FULL TANPA DIPOTONG) ---
+// --- DATA NEGARA ---
 const countries = [
   { name: "Afganistan", code: "af" }, { name: "Afrika Selatan", code: "za" }, { name: "Albania", code: "al" }, { name: "Aljazair", code: "dz" }, { name: "Amerika Serikat (AS)", code: "us" }, { name: "Andorra", code: "ad" }, { name: "Angola", code: "ao" }, { name: "Antigua dan Barbuda", code: "ag" }, { name: "Arab Saudi", code: "sa" }, { name: "Argentina", code: "ar" }, { name: "Australia", code: "au" }, { name: "Austria", code: "at" },
   { name: "Bahama", code: "bs" }, { name: "Bahrain", code: "bh" }, { name: "Bangladesh", code: "bd" }, { name: "Barbados", code: "bb" }, { name: "Belarus", code: "by" }, { name: "Belgia", code: "be" }, { name: "Belize", code: "bz" }, { name: "Benin", code: "bj" }, { name: "Bhutan", code: "bt" }, { name: "Bolivia", code: "bo" }, { name: "Bosnia dan Herzegovina", code: "ba" }, { name: "Botswana", code: "bw" }, { name: "Brasil", code: "br" }, { name: "Brunei Darussalam", code: "bn" }, { name: "Bulgaria", code: "bg" }, { name: "Burkina Faso", code: "bf" }, { name: "Burundi", code: "bi" },
@@ -38,6 +38,15 @@ const getCountryFlagCode = (countryName: string) => {
   return found ? found.code : null;
 };
 
+// --- FUNGSI BARU (POIN 9): Ngambil Nama Asli dari Cookie ---
+const getActiveUserName = () => {
+  if (typeof document !== 'undefined') {
+    const match = document.cookie.match(new RegExp('(^| )user_name=([^;]+)'));
+    if (match) return decodeURIComponent(match[2]);
+  }
+  return "Sistem Admin"; // Fallback kalau gak ketemu
+};
+
 export default function InventoryPage() {
   const router = useRouter();
   
@@ -58,9 +67,9 @@ export default function InventoryPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<any>(null);
   
-  // --- FITUR BARU: STATE UNTUK ANIMASI SUCCESS ---
   const [isSaving, setIsSaving] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false); 
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "success" | "partial_error">("idle");
+  const [woErrorMessage, setWoErrorMessage] = useState(""); 
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -73,7 +82,6 @@ export default function InventoryPage() {
   const [isCountryOpen, setIsCountryOpen] = useState(false);
   const [isManufacturerOpen, setIsManufacturerOpen] = useState(false);
 
-  // --- DITAMBAH nama_klien ---
   const [editFormData, setEditFormData] = useState({
     product_id: "", serial_number: "", nama_mesin: "", nama_klien: "", kategori: "",
     pabrikan: "", negara_asal: "", tahun_pembuatan: "", kondisi: "",
@@ -120,7 +128,8 @@ export default function InventoryPage() {
     setSelectedMachine(machine);
     setEditFotoFile(null); 
     setEditManualFile(null);
-    setIsSuccess(false); // Reset status sukses setiap buka modal baru
+    setUpdateStatus("idle"); 
+    setWoErrorMessage("");
     setEditFormData({
       product_id: machine.product_id || "", 
       serial_number: machine.serial_number || "",
@@ -141,11 +150,11 @@ export default function InventoryPage() {
     e.preventDefault();
     if (!selectedMachine) return;
     setIsSaving(true);
+    setWoErrorMessage("");
 
     let fotoUrl = selectedMachine.foto_mesin;
     let manualUrl = selectedMachine.buku_manual;
 
-    // Upload Foto Baru (jika ada)
     if (editFotoFile) {
       const fileExt = editFotoFile.name.split('.').pop();
       const fileName = `${Date.now()}-foto.${fileExt}`;
@@ -162,7 +171,6 @@ export default function InventoryPage() {
       }
     }
 
-    // Upload Manual Baru (jika ada)
     if (editManualFile) {
       const fileExt = editManualFile.name.split('.').pop();
       const fileName = `${Date.now()}-manual.${fileExt}`;
@@ -179,7 +187,6 @@ export default function InventoryPage() {
       }
     }
 
-    // Update data mesin utama
     const { error: updateError } = await supabase.from("machines").update({
       product_id: editFormData.product_id, 
       serial_number: editFormData.serial_number,
@@ -201,34 +208,49 @@ export default function InventoryPage() {
       return;
     }
 
-    // --- LOGIKA BARU: AUTO-CREATE WORK ORDER ---
+    let hasWoError = false;
+
     if (editFormData.next_service && !updateError) {
-      const woNumber = `WO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      // --- FUNGSI BARU (POIN 8): Generate ID WO Pakai Timestamp Biar Anti-Kembar ---
+      const uniqueTimestamp = Date.now().toString().slice(-6); // Ambil 6 digit terakhir dari millisecond
+      const woNumber = `WO-${new Date().getFullYear()}-${uniqueTimestamp}`;
       
-      await supabase
+      const { error: woInsertError } = await supabase
         .from("work_orders")
         .insert([
           {
             wo_number: woNumber,
-            machine_id: selectedMachine.id,             // Menggunakan ID mesin yang sedang di-edit
-            jadwal_mulai: editFormData.next_service,    // Tanggal dari input Next Service
+            machine_id: selectedMachine.id,             
+            jadwal_mulai: editFormData.next_service,    
             status: "Open",
             judul_pekerjaan: "Servis Berkala Otomatis",
             deskripsi: "Jadwal servis otomatis dari form edit inventory."
           }
         ]);
+
+      if (woInsertError) {
+        hasWoError = true;
+        setWoErrorMessage(woInsertError.message);
+      }
     }
 
-    // Jika semua berhasil, tampilkan animasi sukses tanpa alert()
     setIsSaving(false);
-    setIsSuccess(true); 
-    fetchMachines(); 
 
-    // Tutup otomatis setelah 1.5 detik
-    setTimeout(() => {
-      setIsSuccess(false);
-      setIsEditModalOpen(false);
-    }, 1500);
+    if (hasWoError) {
+      setUpdateStatus("partial_error"); 
+      fetchMachines();
+      setTimeout(() => {
+        setUpdateStatus("idle");
+        setIsEditModalOpen(false);
+      }, 4000); 
+    } else {
+      setUpdateStatus("success"); 
+      fetchMachines(); 
+      setTimeout(() => {
+        setUpdateStatus("idle");
+        setIsEditModalOpen(false);
+      }, 1500);
+    }
   };
 
   const triggerDelete = () => {
@@ -249,8 +271,12 @@ export default function InventoryPage() {
       setDeleteStatus("idle");
     } else {
       setDeleteStatus("success");
+      
+      // --- PERBAIKAN POIN 9: Ambil actor_name dari Cookie (Bukan hardcode) ---
+      const currentUserName = getActiveUserName();
+
       await supabase.from("activity_logs").insert([{
-        actor_name: "Admin",
+        actor_name: currentUserName,
         action_text: `menghapus mesin ${deleteModal.nama} ke tempat sampah`,
         tipe_aktivitas: "Inventory"
       }]);
@@ -464,7 +490,6 @@ export default function InventoryPage() {
                       <td className="p-4 text-[13px] font-medium text-gray-700">{machine.product_id || "-"}</td>
                       <td className="p-4 text-[13px] text-gray-600">{machine.serial_number || "-"}</td>
                       <td className="p-4 text-[13px] font-bold text-gray-900">{machine.nama_mesin || "-"}</td>
-                      {/* NAMPILIN NAMA KLIEN DI TABEL */}
                       <td className="p-4 text-[13px] font-medium text-gray-800">{machine.nama_klien || "-"}</td>
                       <td className="p-4 text-[13px] text-gray-700">{machine.kategori || "-"}</td>
                       
@@ -519,8 +544,7 @@ export default function InventoryPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-[20px] shadow-2xl w-full max-w-[800px] max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 relative">
             
-            {/* --- KONDISI: JIKA SUKSES MENYIMPAN --- */}
-            {isSuccess ? (
+            {updateStatus === "success" ? (
               <div className="flex flex-col items-center justify-center py-16 animate-in zoom-in duration-300">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
@@ -528,8 +552,21 @@ export default function InventoryPage() {
                 <h3 className="text-[18px] font-bold text-gray-900">Berhasil Diperbarui!</h3>
                 <p className="text-[13px] text-gray-500 mt-2">Data mesin dan jadwal service telah disimpan.</p>
               </div>
+            ) : 
+            updateStatus === "partial_error" ? (
+              <div className="flex flex-col items-center justify-center py-16 animate-in zoom-in duration-300 text-center px-6">
+                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4 border border-yellow-200 shadow-sm">
+                  <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <h3 className="text-[18px] font-bold text-gray-900">Pembaruan Sebagian Berhasil</h3>
+                <p className="text-[13px] text-gray-600 mt-2 leading-relaxed">
+                  Data mesin berhasil diperbarui, <strong>namun pembuatan Work Order otomatis ke database gagal.</strong>
+                </p>
+                <div className="mt-4 bg-gray-50 border border-gray-200 p-3 rounded-[8px] w-full max-w-[400px]">
+                  <p className="text-[11px] font-mono text-red-600 text-left break-words">Error: {woErrorMessage}</p>
+                </div>
+              </div>
             ) : (
-              /* --- KONDISI: FORM EDIT --- */
               <>
                 <div className="sticky top-0 bg-white z-50 px-6 py-5 border-b border-gray-100 flex items-center justify-between">
                   <h2 className="text-[18px] font-bold text-gray-900">Detail & Edit Mesin</h2>
@@ -556,7 +593,7 @@ export default function InventoryPage() {
                           <label className="text-[11px] font-bold text-gray-700">Nama Mesin</label>
                           <input type="text" name="nama_mesin" value={editFormData.nama_mesin} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
                         </div>
-                        {/* INPUT NAMA KLIEN BARU DI SINI */}
+                        
                         <div className="space-y-1.5">
                           <label className="text-[11px] font-bold text-gray-700">Nama Klien / Perusahaan</label>
                           <input type="text" name="nama_klien" placeholder="Contoh: PT. Maju Jaya" value={editFormData.nama_klien} onChange={(e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value })} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black" />
