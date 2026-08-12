@@ -83,10 +83,20 @@ export default function AddTeamPage() {
       const fileExt = fotoFile.name.split('.').pop();
       const fileName = `profile-${Date.now()}.${fileExt}`;
       
-      const { data: uploadData } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('machine_files')
         .upload(`profiles/${fileName}`, fotoFile);
         
+      // PENJAGA PINTU: Cek error upload foto!
+      if (uploadError) {
+        setSubmitModal({ 
+          isOpen: true, 
+          status: "error", 
+          message: "Gagal mengupload foto profil: " + uploadError.message 
+        });
+        return; // STOP! Jangan lanjut masukin data ke tabel database.
+      }
+
       if (uploadData) {
         const { data: publicUrlData } = supabase.storage.from('machine_files').getPublicUrl(`profiles/${fileName}`);
         fotoUrl = publicUrlData.publicUrl;
@@ -246,7 +256,7 @@ export default function AddTeamPage() {
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[400px] p-8 text-center animate-in zoom-in-95 duration-200">
             
             {submitModal.status === "error" ? (
-              // TAMPILAN 1: ERROR VALIDASI
+              // TAMPILAN 1: ERROR VALIDASI ATAU UPLOAD
               <>
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5 border border-red-200">
                   <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>

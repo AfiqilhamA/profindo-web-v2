@@ -140,9 +140,8 @@ export default function AddMachinePage() {
     }
   };
 
-  // --- LOGIKA KUNCI MATI (PREVENT DEFAULT) ---
   const handleGenerateQR = (e?: React.MouseEvent | React.FormEvent) => {
-    if (e) e.preventDefault(); // Menahan biar form gak langsung nyimpen!
+    if (e) e.preventDefault(); 
 
     if (!idNumber) {
       alert("Harap isi angka Product ID terlebih dahulu!");
@@ -176,13 +175,11 @@ export default function AddMachinePage() {
   const handleSubmitClick = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Kalau QR belum di-generate (misal gak sengaja pencet Enter di keyboard)
     if (!qrGenerated) {
       handleGenerateQR(e);
       return;
     }
 
-    // Modal konfirmasi baru boleh muncul kalau QR udah tampil
     setSubmitModal({ isOpen: true, status: "confirm" });
   };
 
@@ -192,20 +189,34 @@ export default function AddMachinePage() {
     let fotoUrl = null;
     let manualUrl = null;
 
+    // --- PENJAGA PINTU 1: CEK ERROR UPLOAD FOTO ---
     if (fotoFile) {
       const fileExt = fotoFile.name.split('.').pop();
       const fileName = `${Date.now()}-foto.${fileExt}`;
       const { data: fotoData, error: fotoError } = await supabase.storage.from('machine_files').upload(`foto/${fileName}`, fotoFile);
+      
+      if (fotoError) {
+        alert("Gagal mengupload foto mesin: " + fotoError.message);
+        setSubmitModal({ isOpen: false, status: "confirm" });
+        return; // Stop di sini, jangan lanjut!
+      }
       if (fotoData) {
         const { data: publicUrlData } = supabase.storage.from('machine_files').getPublicUrl(`foto/${fileName}`);
         fotoUrl = publicUrlData.publicUrl;
       }
     }
 
+    // --- PENJAGA PINTU 2: CEK ERROR UPLOAD MANUAL ---
     if (manualFile) {
       const fileExt = manualFile.name.split('.').pop();
       const fileName = `${Date.now()}-manual.${fileExt}`;
       const { data: manualData, error: manualError } = await supabase.storage.from('machine_files').upload(`manual/${fileName}`, manualFile);
+      
+      if (manualError) {
+        alert("Gagal mengupload buku manual: " + manualError.message);
+        setSubmitModal({ isOpen: false, status: "confirm" });
+        return; // Stop di sini, jangan lanjut!
+      }
       if (manualData) {
         const { data: publicUrlData } = supabase.storage.from('machine_files').getPublicUrl(`manual/${fileName}`);
         manualUrl = publicUrlData.publicUrl;

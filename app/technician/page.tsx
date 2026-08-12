@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabase"; 
-import { Html5QrcodeScanner } from "html5-qrcode"; // LIBRARY KAMERA BARU
+import { Html5Qrcode } from "html5-qrcode"; // Ganti pakai ini biar UI kameranya bisa dicustom
 
 export default function TechnicianPage() {
   const router = useRouter();
@@ -15,10 +15,10 @@ export default function TechnicianPage() {
   const [appState, setAppState] = useState<"idle" | "scanning_live" | "scanning_upload" | "form">("idle");
   
   // State Modals
-  const [isModalOpen, setIsModalOpen] = useState(false); // Konfirmasi hasil scan
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false); // Konfirmasi logout
-  const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false); // Konfirmasi 1: Sebelum Kirim
-  const [isSuccessOpen, setIsSuccessOpen] = useState(false); // Konfirmasi 2: Sukses Terkirim
+  const [isModalOpen, setIsModalOpen] = useState(false); 
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false); 
+  const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false); 
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false); 
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,30 +42,37 @@ export default function TechnicianPage() {
   // LOGIKA LIVE KAMERA (BCA MOBILE STYLE)
   // ==========================================
   useEffect(() => {
-    if (appState === "scanning_live") {
-      const scanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
-      );
+    let scanner: Html5Qrcode | null = null;
 
-      scanner.render(
+    if (appState === "scanning_live") {
+      scanner = new Html5Qrcode("qr-reader");
+
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
-          // Kalau berhasil dapet kodenya
-          scanner.clear();
-          setScannedId(decodedText);
-          setAppState("idle");
-          setIsModalOpen(true); // Buka pop-up konfirmasi
+          if (scanner && scanner.isScanning) {
+            scanner.stop().then(() => {
+              setScannedId(decodedText);
+              setAppState("idle");
+              setIsModalOpen(true);
+            }).catch(console.error);
+          }
         },
-        (error) => {
+        (errorMessage) => {
           // Abaikan error saat proses nyari QR
         }
-      );
-
-      return () => {
-        scanner.clear().catch(console.error);
-      };
+      ).catch(err => {
+        alert("Gagal mengakses kamera. Pastikan izin kamera diberikan.");
+        setAppState("idle");
+      });
     }
+
+    return () => {
+      if (scanner && scanner.isScanning) {
+        scanner.stop().catch(console.error);
+      }
+    };
   }, [appState]);
 
   const confirmLogout = () => {
@@ -74,20 +81,32 @@ export default function TechnicianPage() {
   };
 
   // ==========================================
-  // LOGIKA UPLOAD QR (CADANGAN KALAU SINYAL JELEK)
+  // LOGIKA UPLOAD QR (BACA GAMBAR BENERAN)
   // ==========================================
   const handleUploadQRClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleQRFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleQRFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
       setAppState("scanning_upload");
-      setTimeout(() => {
+
+      try {
+        const html5QrCode = new Html5Qrcode("reader-hidden");
+        const decodedText = await html5QrCode.scanFile(file, true);
+
+        setScannedId(decodedText); 
         setAppState("idle");
-        setScannedId("PFD-23772938"); // Simulasi ID dari foto galeri
         setIsModalOpen(true); 
-      }, 1500);
+      } catch (err) {
+        alert("QR Code tidak terbaca. Pastikan foto tidak blur dan jelas.");
+        setAppState("idle");
+      }
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -99,7 +118,7 @@ export default function TechnicianPage() {
     }
 
     setIsModalOpen(false);
-    setAppState("scanning_upload"); // Pake loading state sebentar
+    setAppState("scanning_upload"); 
 
     const { data, error } = await supabase
       .from("machines")
@@ -132,7 +151,6 @@ export default function TechnicianPage() {
       alert("Harap isi detail pekerjaan!");
       return;
     }
-    // Buka Konfirmasi Ke-1
     setIsSubmitConfirmOpen(true);
   };
 
@@ -171,7 +189,6 @@ export default function TechnicianPage() {
         tipe_aktivitas: "Work Order"
       }]);
 
-      // Buka Konfirmasi Ke-2 (Sukses)
       setIsSuccessOpen(true);
 
     } catch (err: any) {
@@ -194,6 +211,9 @@ export default function TechnicianPage() {
 
   return (
     <div className="min-h-screen bg-[#Eef1F4] flex justify-center relative">
+      {/* ELEMEN TERSEMBUNYI BUAT BACA FILE GAMBAR */}
+      <div id="reader-hidden" className="hidden"></div>
+
       <div className="w-full max-w-md bg-[#Eef1F4] min-h-screen relative shadow-2xl overflow-hidden flex flex-col">
         
         {/* ======================================= */}

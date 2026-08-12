@@ -19,8 +19,8 @@ export default function TechnicianFormPage() {
   const [fotoFile, setFotoFile] = useState<File | null>(null);
 
   useEffect(() => {
-    // Ambil nama teknisi dari local storage
-    const savedName = localStorage.getItem("tech_name") || "Ranel";
+    // Ambil nama teknisi dari local storage (SUDAH DIPERBAIKI JADI user_name)
+    const savedName = localStorage.getItem("user_name") || "Ranel";
     setTechName(savedName);
 
     const fetchMachine = async () => {
@@ -64,7 +64,7 @@ export default function TechnicianFormPage() {
       tanggal: new Date().toISOString().split('T')[0],
       judul_service: "Servis Lapangan",
       detail_pekerjaan: detailPekerjaan,
-      pic: techName, // <--- INI DIA YG BIKIN NAMA 'RANEL' MASUK DB!
+      pic: techName, 
       foto_dokumentasi: fotoUrl
     }]);
 

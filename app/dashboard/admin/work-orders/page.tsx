@@ -28,9 +28,10 @@ export default function WorkOrdersPage() {
     jadwal_selesai: "",
   });
 
+  // State Modal dengan Error Handling
   const [submitModal, setSubmitModal] = useState({ isOpen: false, status: "confirm" as "confirm" | "saving" | "success" | "error", message: "" });
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: "", judul: "", status: "idle" as "idle" | "deleting" | "success" });
-  const [statusModal, setStatusModal] = useState({ isOpen: false, id: "", wo_number: "", newStatus: "", status: "confirm" as "confirm" | "saving" | "success" });
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: "", judul: "", status: "idle" as "idle" | "deleting" | "success" | "error", message: "" });
+  const [statusModal, setStatusModal] = useState({ isOpen: false, id: "", wo_number: "", newStatus: "", status: "confirm" as "confirm" | "saving" | "success" | "error", message: "" });
 
   useEffect(() => {
     fetchData();
@@ -54,9 +55,7 @@ export default function WorkOrdersPage() {
     // FILTER SUPER KETAT: SINGKIRKAN ADMIN DARI DAFTAR TEKNISI!
     if (techRes.data) {
       const fieldTechnicians = techRes.data.filter((tech: any) => {
-        // Cek kolom role/posisi apa pun nama kolomnya di DB lu
         const role = (tech.role || tech.jabatan || tech.posisi || "").toLowerCase();
-        // Kalau rolenya admin, jangan dimasukin ke state
         return !role.includes("admin");
       });
       setTechnicians(fieldTechnicians);
@@ -114,13 +113,14 @@ export default function WorkOrdersPage() {
     };
 
     let error;
+    const actorName = localStorage.getItem("user_name") || "Admin"; // Konsisten pakai data login
 
     if (modalMode === "add") {
       const { error: insErr } = await supabase.from("work_orders").insert([payload]);
       error = insErr;
       if (!error) {
         await supabase.from("activity_logs").insert([{
-          actor_name: "Afiq Ilham",
+          actor_name: actorName,
           action_text: `membuat Work Order baru (${payload.wo_number})`,
           tipe_aktivitas: "Work Order"
         }]);
@@ -130,7 +130,7 @@ export default function WorkOrdersPage() {
       error = updErr;
       if (!error) {
         await supabase.from("activity_logs").insert([{
-          actor_name: "Afiq Ilham",
+          actor_name: actorName,
           action_text: `memperbarui data Work Order (${payload.wo_number})`,
           tipe_aktivitas: "Work Order"
         }]);
@@ -150,42 +150,49 @@ export default function WorkOrdersPage() {
   };
 
   const triggerStatusUpdate = (id: string, wo_number: string, newStatus: string) => {
-    setStatusModal({ isOpen: true, id, wo_number, newStatus, status: "confirm" });
+    setStatusModal({ isOpen: true, id, wo_number, newStatus, status: "confirm", message: "" });
   };
 
   const executeStatusUpdate = async () => {
-    setStatusModal({ ...statusModal, status: "saving" });
+    setStatusModal({ ...statusModal, status: "saving", message: "" });
     const { error } = await supabase.from("work_orders").update({ status: statusModal.newStatus }).eq("id", statusModal.id);
     
     if (!error) {
+       const actorName = localStorage.getItem("user_name") || "Admin"; // Konsisten pakai data login
        await supabase.from("activity_logs").insert([{
-         actor_name: "Afiq Ilham", 
+         actor_name: actorName, 
          action_text: `mengubah status ${statusModal.wo_number} menjadi ${statusModal.newStatus}`,
          tipe_aktivitas: "Work Order"
        }]);
 
        setStatusModal({ ...statusModal, status: "success" });
        setTimeout(() => {
-         setStatusModal({ isOpen: false, id: "", wo_number: "", newStatus: "", status: "confirm" });
+         setStatusModal({ isOpen: false, id: "", wo_number: "", newStatus: "", status: "confirm", message: "" });
          fetchData();
        }, 1500);
+    } else {
+       // KALO GAGAL, KASIH TAU ERRORNYA
+       setStatusModal({ ...statusModal, status: "error", message: error.message });
     }
   };
 
   const triggerDelete = (id: string, judul: string) => {
-    setDeleteModal({ isOpen: true, id, judul, status: "idle" });
+    setDeleteModal({ isOpen: true, id, judul, status: "idle", message: "" });
   };
 
   const executeDelete = async () => {
-    setDeleteModal({ ...deleteModal, status: "deleting" });
+    setDeleteModal({ ...deleteModal, status: "deleting", message: "" });
     const { error } = await supabase.from("work_orders").delete().eq("id", deleteModal.id);
     
     if (!error) {
       setDeleteModal({ ...deleteModal, status: "success" });
       setTimeout(() => {
-        setDeleteModal({ isOpen: false, id: "", judul: "", status: "idle" });
+        setDeleteModal({ isOpen: false, id: "", judul: "", status: "idle", message: "" });
         fetchData();
       }, 1500);
+    } else {
+      // KALO GAGAL, KASIH TAU ERRORNYA
+      setDeleteModal({ ...deleteModal, status: "error", message: error.message });
     }
   };
 
@@ -372,14 +379,22 @@ export default function WorkOrdersPage() {
       )}
 
       {/* ========================================= */}
-      {/* MODALS KONFIRMASI (Simpan, Status, Hapus) */}
+      {/* MODALS KONFIRMASI DENGAN ERROR HANDLING */}
       {/* ========================================= */}
       
+      {/* 1. MODAL SUBMIT FORM */}
       {submitModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[400px] p-8 text-center animate-in zoom-in-95 duration-200">
             {submitModal.status === "error" ? (
-              <><h3 className="text-[18px] font-bold text-red-600 mb-2">Error!</h3><p className="text-[13px] text-gray-500 mb-6">{submitModal.message}</p><button onClick={() => setSubmitModal({ ...submitModal, isOpen: false })} className="w-full bg-black text-white py-2.5 rounded-[10px]">Tutup</button></>
+              <>
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </div>
+                <h3 className="text-[18px] font-bold text-red-600 mb-2">Simpan Gagal!</h3>
+                <p className="text-[13px] text-gray-500 mb-6">{submitModal.message}</p>
+                <button onClick={() => setSubmitModal({ ...submitModal, status: "confirm", message: "" })} className="w-full bg-black text-white py-2.5 rounded-[10px] text-[13px] font-bold">Tutup & Perbaiki</button>
+              </>
             ) : submitModal.status === "success" ? (
               <div className="flex flex-col items-center justify-center py-4"><div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4"><svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></div><h3 className="text-[18px] font-bold text-gray-900">Work Order Tersimpan!</h3></div>
             ) : submitModal.status === "saving" ? (
@@ -391,10 +406,20 @@ export default function WorkOrdersPage() {
         </div>
       )}
 
+      {/* 2. MODAL UPDATE STATUS */}
       {statusModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[400px] p-8 text-center animate-in zoom-in-95 duration-200">
-            {statusModal.status === "success" ? (
+            {statusModal.status === "error" ? (
+              <>
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </div>
+                <h3 className="text-[18px] font-bold text-red-600 mb-2">Update Gagal!</h3>
+                <p className="text-[13px] text-gray-500 mb-6">{statusModal.message}</p>
+                <button onClick={() => setStatusModal({ ...statusModal, status: "confirm", message: "" })} className="w-full bg-black text-white py-2.5 rounded-[10px] text-[13px] font-bold">Tutup & Coba Lagi</button>
+              </>
+            ) : statusModal.status === "success" ? (
               <div className="flex flex-col items-center justify-center py-4"><div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4"><svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></div><h3 className="text-[18px] font-bold text-gray-900">Status Berhasil Diubah!</h3></div>
             ) : statusModal.status === "saving" ? (
               <div className="flex flex-col items-center justify-center py-6"><svg className="animate-spin h-10 w-10 text-orange-500 mb-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><h3 className="text-[16px] font-bold text-gray-900">Memperbarui Status...</h3></div>
@@ -405,10 +430,20 @@ export default function WorkOrdersPage() {
         </div>
       )}
 
+      {/* 3. MODAL HAPUS WO */}
       {deleteModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[400px] p-8 text-center animate-in zoom-in-95 duration-200">
-            {deleteModal.status === "success" ? (
+            {deleteModal.status === "error" ? (
+              <>
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </div>
+                <h3 className="text-[18px] font-bold text-red-600 mb-2">Hapus Gagal!</h3>
+                <p className="text-[13px] text-gray-500 mb-6">{deleteModal.message}</p>
+                <button onClick={() => setDeleteModal({ ...deleteModal, status: "idle", message: "" })} className="w-full bg-black text-white py-2.5 rounded-[10px] text-[13px] font-bold">Tutup & Coba Lagi</button>
+              </>
+            ) : deleteModal.status === "success" ? (
               <div className="flex flex-col items-center justify-center py-4"><div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4"><svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></div><h3 className="text-[18px] font-bold text-gray-900">Berhasil Dihapus!</h3></div>
             ) : deleteModal.status === "deleting" ? (
               <div className="flex flex-col items-center justify-center py-6"><svg className="animate-spin h-10 w-10 text-red-500 mb-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><h3 className="text-[16px] font-bold text-gray-900">Menghapus...</h3></div>

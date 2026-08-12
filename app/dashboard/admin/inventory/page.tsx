@@ -142,20 +142,36 @@ export default function InventoryPage() {
     let fotoUrl = selectedMachine.foto_mesin;
     let manualUrl = selectedMachine.buku_manual;
 
+    // --- PENJAGA PINTU 1: ERROR UPLOAD FOTO ---
     if (editFotoFile) {
       const fileExt = editFotoFile.name.split('.').pop();
       const fileName = `${Date.now()}-foto.${fileExt}`;
-      const { data } = await supabase.storage.from('machine_files').upload(`foto/${fileName}`, editFotoFile);
+      const { data, error: fotoError } = await supabase.storage.from('machine_files').upload(`foto/${fileName}`, editFotoFile);
+      
+      if (fotoError) {
+        alert("Gagal mengupload foto baru: " + fotoError.message);
+        setIsSaving(false);
+        return; // STOP!
+      }
+      
       if (data) {
         const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`foto/${fileName}`);
         fotoUrl = pubUrl.publicUrl;
       }
     }
 
+    // --- PENJAGA PINTU 2: ERROR UPLOAD MANUAL ---
     if (editManualFile) {
       const fileExt = editManualFile.name.split('.').pop();
       const fileName = `${Date.now()}-manual.${fileExt}`;
-      const { data } = await supabase.storage.from('machine_files').upload(`manual/${fileName}`, editManualFile);
+      const { data, error: manualError } = await supabase.storage.from('machine_files').upload(`manual/${fileName}`, editManualFile);
+      
+      if (manualError) {
+        alert("Gagal mengupload buku manual baru: " + manualError.message);
+        setIsSaving(false);
+        return; // STOP!
+      }
+
       if (data) {
         const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`manual/${fileName}`);
         manualUrl = pubUrl.publicUrl;
@@ -177,6 +193,13 @@ export default function InventoryPage() {
       buku_manual: manualUrl
     }).eq("id", selectedMachine.id);
 
+    if (updateError) {
+      alert("Gagal memperbarui data mesin: " + updateError.message);
+      setIsSaving(false);
+      return; // STOP!
+    }
+
+    // Insert next_service kalau ada isiannya
     if (editFormData.next_service && !updateError) {
       await supabase.from("machine_services").insert([{
         machine_id: selectedMachine.id, tanggal: editFormData.next_service,
