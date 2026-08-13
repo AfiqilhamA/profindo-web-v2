@@ -3,34 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../../utils/supabase"; 
+import { countries } from "../../../../../utils/countries";
 
-// --- DATA NEGARA FULL DENGAN KODE BENDERA ---
-const countries = [
-  { name: "Afganistan", code: "af" }, { name: "Afrika Selatan", code: "za" }, { name: "Albania", code: "al" }, { name: "Aljazair", code: "dz" }, { name: "Amerika Serikat (AS)", code: "us" }, { name: "Andorra", code: "ad" }, { name: "Angola", code: "ao" }, { name: "Antigua dan Barbuda", code: "ag" }, { name: "Arab Saudi", code: "sa" }, { name: "Argentina", code: "ar" }, { name: "Australia", code: "au" }, { name: "Austria", code: "at" },
-  { name: "Bahama", code: "bs" }, { name: "Bahrain", code: "bh" }, { name: "Bangladesh", code: "bd" }, { name: "Barbados", code: "bb" }, { name: "Belarus", code: "by" }, { name: "Belgia", code: "be" }, { name: "Belize", code: "bz" }, { name: "Benin", code: "bj" }, { name: "Bhutan", code: "bt" }, { name: "Bolivia", code: "bo" }, { name: "Bosnia dan Herzegovina", code: "ba" }, { name: "Botswana", code: "bw" }, { name: "Brasil", code: "br" }, { name: "Brunei Darussalam", code: "bn" }, { name: "Bulgaria", code: "bg" }, { name: "Burkina Faso", code: "bf" }, { name: "Burundi", code: "bi" },
-  { name: "Ceko", code: "cz" }, { name: "Chad", code: "td" }, { name: "Chili", code: "cl" }, { name: "China", code: "cn" },
-  { name: "Denmark", code: "dk" }, { name: "Djibouti", code: "dj" }, { name: "Dominika", code: "dm" },
-  { name: "Ekuador", code: "ec" }, { name: "El Salvador", code: "sv" }, { name: "Eritrea", code: "er" }, { name: "Estonia", code: "ee" }, { name: "Eswatini", code: "sz" }, { name: "Ethiopia", code: "et" },
-  { name: "Fiji", code: "fj" }, { name: "Filipina", code: "ph" }, { name: "Finlandia", code: "fi" },
-  { name: "Gabon", code: "ga" }, { name: "Gambia", code: "gm" }, { name: "Ghana", code: "gh" }, { name: "Grenada", code: "gd" }, { name: "Guatemala", code: "gt" }, { name: "Guinea", code: "gn" }, { name: "Guinea Khatulistiwa", code: "gq" }, { name: "Guinea-Bissau", code: "gw" }, { name: "Guyana", code: "gy" },
-  { name: "Haiti", code: "ht" }, { name: "Honduras", code: "hn" }, { name: "Hungaria", code: "hu" },
-  { name: "India", code: "in" }, { name: "Indonesia", code: "id" }, { name: "Inggris Raya", code: "gb" }, { name: "Irak", code: "iq" }, { name: "Iran", code: "ir" }, { name: "Irlandia", code: "ie" }, { name: "Islandia", code: "is" }, { name: "Israel", code: "il" }, { name: "Italia", code: "it" },
-  { name: "Jamaika", code: "jm" }, { name: "Jepang", code: "jp" }, { name: "Jerman", code: "de" },
-  { name: "Kamboja", code: "kh" }, { name: "Kamerun", code: "cm" }, { name: "Kanada", code: "ca" }, { name: "Kazakhstan", code: "kz" }, { name: "Kenya", code: "ke" }, { name: "Kepulauan Marshall", code: "mh" }, { name: "Kepulauan Solomon", code: "sb" }, { name: "Kirgistan", code: "kg" }, { name: "Kiribati", code: "ki" }, { name: "Kolombia", code: "co" }, { name: "Komoro", code: "km" }, { name: "Kongo", code: "cg" }, { name: "Korea Selatan", code: "kr" }, { name: "Korea Utara", code: "kp" }, { name: "Kosta Rika", code: "cr" }, { name: "Kroasia", code: "hr" }, { name: "Kuba", code: "cu" }, { name: "Kuwait", code: "kw" },
-  { name: "Laos", code: "la" }, { name: "Latvia", code: "lv" }, { name: "Lebanon", code: "lb" }, { name: "Lesotho", code: "ls" }, { name: "Liberia", code: "lr" }, { name: "Libya", code: "ly" }, { name: "Lithuania", code: "lt" }, { name: "Luksemburg", code: "lu" },
-  { name: "Madagaskar", code: "mg" }, { name: "Makedonia Utara", code: "mk" }, { name: "Malawi", code: "mw" }, { name: "Malaysia", code: "my" }, { name: "Maladewa", code: "mv" }, { name: "Mali", code: "ml" }, { name: "Malta", code: "mt" }, { name: "Maroko", code: "ma" }, { name: "Mauritania", code: "mr" }, { name: "Mauritius", code: "mu" }, { name: "Meksiko", code: "mx" }, { name: "Mesir", code: "eg" }, { name: "Mikronesia", code: "fm" }, { name: "Moldova", code: "md" }, { name: "Monako", code: "mc" }, { name: "Mongolia", code: "mn" }, { name: "Montenegro", code: "me" }, { name: "Mozambik", code: "mz" }, { name: "Myanmar", code: "mm" },
-  { name: "Namibia", code: "na" }, { name: "Nauru", code: "nr" }, { name: "Nepal", code: "np" }, { name: "Niger", code: "ne" }, { name: "Nigeria", code: "ng" }, { name: "Nikaragua", code: "ni" }, { name: "Norwegia", code: "no" },
-  { name: "Oman", code: "om" },
-  { name: "Pakistan", code: "pk" }, { name: "Palau", code: "pw" }, { name: "Palestina", code: "ps" }, { name: "Panama", code: "pa" }, { name: "Pantai Gading", code: "ci" }, { name: "Papua Nugini", code: "pg" }, { name: "Paraguay", code: "py" }, { name: "Peru", code: "pe" }, { name: "Polandia", code: "pl" }, { name: "Portugal", code: "pt" }, { name: "Prancis", code: "fr" },
-  { name: "Qatar", code: "qa" },
-  { name: "Republik Afrika Tengah", code: "cf" }, { name: "Republik Demokratik Kongo", code: "cd" }, { name: "Republik Dominika", code: "do" }, { name: "Rumania", code: "ro" }, { name: "Rusia", code: "ru" }, { name: "Rwanda", code: "rw" },
-  { name: "Saint Kitts dan Nevis", code: "kn" }, { name: "Saint Lucia", code: "lc" }, { name: "Saint Vincent dan Grenadines", code: "vc" }, { name: "Samoa", code: "ws" }, { name: "San Marino", code: "sm" }, { name: "Sao Tome dan Principe", code: "st" }, { name: "Selandia Baru", code: "nz" }, { name: "Senegal", code: "sn" }, { name: "Serbia", code: "rs" }, { name: "Seychelles", code: "sc" }, { name: "Sierra Leone", code: "sl" }, { name: "Singapura", code: "sg" }, { name: "Siprus", code: "cy" }, { name: "Slowakia", code: "sk" }, { name: "Slovenia", code: "si" }, { name: "Somalia", code: "so" }, { name: "Spanyol", code: "es" }, { name: "Sri Lanka", code: "lk" }, { name: "Sudan", code: "sd" }, { name: "Sudan Selatan", code: "ss" }, { name: "Suriah", code: "sy" }, { name: "Suriname", code: "sr" }, { name: "Swedia", code: "se" }, { name: "Swiss", code: "ch" },
-  { name: "Taiwan", code: "tw" }, { name: "Tajikistan", code: "tj" }, { name: "Tanjung Verde", code: "cv" }, { name: "Tanzania", code: "tz" }, { name: "Thailand", code: "th" }, { name: "Timor Leste", code: "tl" }, { name: "Tiongkok (China)", code: "cn" }, { name: "Togo", code: "tg" }, { name: "Tonga", code: "to" }, { name: "Trinidad dan Tobago", code: "tt" }, { name: "Tunisia", code: "tn" }, { name: "Turki", code: "tr" }, { name: "Turkmenistan", code: "tm" }, { name: "Tuvalu", code: "tv" },
-  { name: "Uganda", code: "ug" }, { name: "Ukraina", code: "ua" }, { name: "Uni Emirat Arab (UEA)", code: "ae" }, { name: "Uruguay", code: "uy" }, { name: "Uzbekistan", code: "uz" },
-  { name: "Vanuatu", code: "vu" }, { name: "Vatikan", code: "va" }, { name: "Venezuela", code: "ve" }, { name: "Vietnam", code: "vn" },
-  { name: "Yaman", code: "ye" }, { name: "Yordania", code: "jo" }, { name: "Yunani", code: "gr" },
-  { name: "Zambia", code: "zm" }, { name: "Zimbabwe", code: "zw" }
-];
 
 // FUNGSI SAKTI: BAKAR TIMESTAMP
 const addTimestampToImage = (file: File): Promise<File> => {
@@ -93,7 +67,7 @@ export default function AddMachinePage() {
   const [formData, setFormData] = useState({
     serial_number: "",
     nama_mesin: "",
-    nama_klien: "", // --- TAMBAHAN KOLOM NAMA KLIEN ---
+    nama_klien: "", 
     kategori: "",
     tahun_pembuatan: "",
     kondisi: "",
@@ -117,6 +91,9 @@ export default function AddMachinePage() {
     status: "confirm"
   });
 
+  // --- STATE BARU: PENYIMPAN PESAN ERROR VALIDASI ---
+  const [formError, setFormError] = useState("");
+
   const filteredCountries = countries.filter(country => country.name.toLowerCase().includes(countryQuery.toLowerCase()));
   const selectedCountryData = countries.find(c => c.name === countryQuery);
 
@@ -125,6 +102,7 @@ export default function AddMachinePage() {
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormError(""); // Hilangkan error kalau user mulai ngetik lagi
   };
 
   const handleFotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,13 +119,49 @@ export default function AddMachinePage() {
     }
   };
 
+  // --- FUNGSI BARU: SATPAM VALIDASI FORM ---
+  const validateForm = () => {
+    setFormError("");
+    
+    if (!idNumber.trim()) return "Angka Product ID wajib diisi.";
+    if (!formData.serial_number.trim()) return "Serial Number wajib diisi.";
+    if (!formData.nama_mesin.trim()) return "Nama Mesin wajib diisi.";
+    if (!formData.kategori.trim()) return "Kategori wajib diisi.";
+    if (!manufacturerQuery.trim()) return "Pabrikan wajib dipilih/diisi.";
+    if (!countryQuery.trim()) return "Negara Asal wajib dipilih/diisi.";
+    if (!formData.tanggal_serah_terima) return "Tanggal Serah Terima wajib diisi.";
+
+    // Validasi Tahun Pembuatan yang super ketat
+    const currentYear = new Date().getFullYear();
+    const yearRegex = /^\d{4}$/; // Harus murni 4 digit angka
+    
+    if (!formData.tahun_pembuatan.trim()) {
+      return "Tahun Pembuatan wajib diisi.";
+    }
+    if (!yearRegex.test(formData.tahun_pembuatan)) {
+      return "Tahun Pembuatan harus berupa 4 digit angka (contoh: 2024).";
+    }
+    const yearInt = parseInt(formData.tahun_pembuatan);
+    if (yearInt < 1900 || yearInt > currentYear + 1) {
+      return `Tahun Pembuatan harus masuk akal (1900 - ${currentYear + 1}).`;
+    }
+
+    if (!formData.kondisi) return "Kondisi mesin wajib dipilih.";
+
+    return null; // Kalau null berarti LULUS UJI ✅
+  };
+
   const handleGenerateQR = (e?: React.MouseEvent | React.FormEvent) => {
     if (e) e.preventDefault(); 
 
-    if (!idNumber) {
-      alert("Harap isi angka Product ID terlebih dahulu!");
+    // --- PANGGIL SATPAM VALIDASI SEBELUM BIKIN QR ---
+    const errorMsg = validateForm();
+    if (errorMsg) {
+      setFormError(errorMsg);
+      window.scrollTo({ top: 0, behavior: "smooth" }); // Scroll layar ke atas biar error kelihatan
       return;
     }
+
     const finalProductId = `${idPrefix}-${idNumber}`;
     const generatedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(finalProductId)}`;
     setQrUrl(generatedQrUrl);
@@ -175,6 +189,14 @@ export default function AddMachinePage() {
 
   const handleSubmitClick = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // --- PANGGIL SATPAM VALIDASI SEBELUM MUNCULIN POP-UP SIMPAN ---
+    const errorMsg = validateForm();
+    if (errorMsg) {
+      setFormError(errorMsg);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     
     if (!qrGenerated) {
       handleGenerateQR(e);
@@ -231,7 +253,7 @@ export default function AddMachinePage() {
           product_id: finalProductId,
           serial_number: formData.serial_number,
           nama_mesin: formData.nama_mesin,
-          nama_klien: formData.nama_klien, // Simpan Nama Klien ke database
+          nama_klien: formData.nama_klien,
           kategori: formData.kategori,
           pabrikan: manufacturerQuery,
           negara_asal: countryQuery, 
@@ -267,6 +289,14 @@ export default function AddMachinePage() {
 
       <form onSubmit={handleSubmitClick} className="bg-white border border-gray-200 rounded-[16px] shadow-sm p-6 sm:p-8">
         
+        {/* --- KOTAK PESAN ERROR JIKA VALIDASI GAGAL --- */}
+        {formError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-[10px] flex items-start gap-3 animate-in fade-in zoom-in duration-300">
+            <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <p className="text-[13px] font-bold text-red-700 leading-tight">{formError}</p>
+          </div>
+        )}
+
         <div className="mb-8">
           <h2 className="text-[14px] font-bold text-gray-900 border-b border-gray-200 pb-3 mb-6">Deskripsi</h2>
           
@@ -278,7 +308,7 @@ export default function AddMachinePage() {
                 <div className="relative w-1/3">
                   <select 
                     value={idPrefix} 
-                    onChange={(e) => setIdPrefix(e.target.value)} 
+                    onChange={(e) => { setIdPrefix(e.target.value); setFormError(""); }} 
                     className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] font-bold outline-none focus:border-black transition-colors appearance-none bg-gray-50 text-gray-800"
                   >
                     <option value="PFD">PFD</option>
@@ -290,25 +320,23 @@ export default function AddMachinePage() {
                 <input 
                   type="text" 
                   placeholder="Contoh: 12345" 
-                  required 
                   value={idNumber} 
-                  onChange={(e) => setIdNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="w-2/3 border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" 
+                  onChange={(e) => { setIdNumber(e.target.value.replace(/[^0-9]/g, '')); setFormError(""); }}
+                  className={`w-2/3 border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors ${formError.includes("Product ID") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`} 
                 />
               </div>
             </div>
             
             <div className="space-y-1.5">
               <label className="text-[12px] font-bold text-gray-700">Serial Number</label>
-              <input type="text" name="serial_number" value={formData.serial_number} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
+              <input type="text" name="serial_number" value={formData.serial_number} onChange={handleTextChange} className={`w-full border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors ${formError.includes("Serial Number") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`} />
             </div>
             
             <div className="space-y-1.5">
               <label className="text-[12px] font-bold text-gray-700">Nama Mesin</label>
-              <input type="text" name="nama_mesin" required value={formData.nama_mesin} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
+              <input type="text" name="nama_mesin" value={formData.nama_mesin} onChange={handleTextChange} className={`w-full border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors ${formError.includes("Nama Mesin") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`} />
             </div>
 
-            {/* --- FITUR BARU: INPUT NAMA KLIEN (OPSIONAL) --- */}
             <div className="space-y-1.5">
               <label className="text-[12px] font-bold text-gray-700">Nama Klien / Perusahaan <span className="text-gray-400 font-normal">(Opsional)</span></label>
               <input type="text" name="nama_klien" placeholder="Contoh: PT. Maju Jaya" value={formData.nama_klien} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
@@ -316,7 +344,7 @@ export default function AddMachinePage() {
             
             <div className="space-y-1.5 sm:col-span-2">
               <label className="text-[12px] font-bold text-gray-700">Kategori</label>
-              <input type="text" name="kategori" value={formData.kategori} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
+              <input type="text" name="kategori" value={formData.kategori} onChange={handleTextChange} className={`w-full border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors ${formError.includes("Kategori") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`} />
             </div>
             
             <div className="space-y-1.5 relative z-20">
@@ -328,11 +356,11 @@ export default function AddMachinePage() {
                 <input 
                   type="text" 
                   value={manufacturerQuery}
-                  onChange={(e) => { setManufacturerQuery(e.target.value); setIsManufacturerOpen(true); }}
+                  onChange={(e) => { setManufacturerQuery(e.target.value); setIsManufacturerOpen(true); setFormError(""); }}
                   onFocus={() => setIsManufacturerOpen(true)}
                   onBlur={() => setTimeout(() => setIsManufacturerOpen(false), 200)}
                   placeholder="Ketik nama negara..."
-                  className={`w-full border border-gray-200 rounded-[8px] ${selectedManufacturerData ? 'pl-10' : 'pl-3'} pr-8 py-2.5 text-[13px] outline-none focus:border-black transition-colors bg-white`}
+                  className={`w-full border rounded-[8px] ${selectedManufacturerData ? 'pl-10' : 'pl-3'} pr-8 py-2.5 text-[13px] outline-none transition-colors bg-white ${formError.includes("Pabrikan") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`}
                 />
                 <svg className="absolute right-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
               </div>
@@ -342,7 +370,7 @@ export default function AddMachinePage() {
                     filteredManufacturers.map((country, idx) => (
                       <div 
                         key={idx}
-                        onMouseDown={(e) => { e.preventDefault(); setManufacturerQuery(country.name); setIsManufacturerOpen(false); }}
+                        onMouseDown={(e) => { e.preventDefault(); setManufacturerQuery(country.name); setIsManufacturerOpen(false); setFormError(""); }}
                         className="flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-gray-700 hover:bg-gray-100 hover:text-black cursor-pointer transition-colors border-b border-gray-50 last:border-0"
                       >
                         <img src={`https://flagcdn.com/w20/${country.code}.png`} alt={country.name} className="w-5 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)]" />
@@ -363,11 +391,11 @@ export default function AddMachinePage() {
                 <input 
                   type="text" 
                   value={countryQuery}
-                  onChange={(e) => { setCountryQuery(e.target.value); setIsCountryOpen(true); }}
+                  onChange={(e) => { setCountryQuery(e.target.value); setIsCountryOpen(true); setFormError(""); }}
                   onFocus={() => setIsCountryOpen(true)}
                   onBlur={() => setTimeout(() => setIsCountryOpen(false), 200)}
                   placeholder="Ketik nama negara..."
-                  className={`w-full border border-gray-200 rounded-[8px] ${selectedCountryData ? 'pl-10' : 'pl-3'} pr-8 py-2.5 text-[13px] outline-none focus:border-black transition-colors bg-white`}
+                  className={`w-full border rounded-[8px] ${selectedCountryData ? 'pl-10' : 'pl-3'} pr-8 py-2.5 text-[13px] outline-none transition-colors bg-white ${formError.includes("Negara Asal") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`}
                 />
                 <svg className="absolute right-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
               </div>
@@ -377,7 +405,7 @@ export default function AddMachinePage() {
                     filteredCountries.map((country, idx) => (
                       <div 
                         key={idx}
-                        onMouseDown={(e) => { e.preventDefault(); setCountryQuery(country.name); setIsCountryOpen(false); }}
+                        onMouseDown={(e) => { e.preventDefault(); setCountryQuery(country.name); setIsCountryOpen(false); setFormError(""); }}
                         className="flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-gray-700 hover:bg-gray-100 hover:text-black cursor-pointer transition-colors border-b border-gray-50 last:border-0"
                       >
                         <img src={`https://flagcdn.com/w20/${country.code}.png`} alt={country.name} className="w-5 h-auto rounded-[2px] shadow-[0_0_2px_rgba(0,0,0,0.3)]" />
@@ -391,17 +419,17 @@ export default function AddMachinePage() {
 
             <div className="space-y-1.5">
               <label className="text-[12px] font-bold text-gray-700">Tanggal Serah Terima</label>
-              <input type="date" name="tanggal_serah_terima" value={formData.tanggal_serah_terima} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
+              <input type="date" name="tanggal_serah_terima" value={formData.tanggal_serah_terima} onChange={handleTextChange} className={`w-full border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors ${formError.includes("Tanggal") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`} />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-[12px] font-bold text-gray-700">Tahun Pembuatan</label>
-              <input type="text" name="tahun_pembuatan" value={formData.tahun_pembuatan} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
+              <input type="text" name="tahun_pembuatan" value={formData.tahun_pembuatan} onChange={handleTextChange} placeholder="Contoh: 2024" className={`w-full border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors ${formError.includes("Tahun") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`} />
             </div>
             
             <div className="space-y-1.5 sm:col-span-2 relative">
               <label className="text-[12px] font-bold text-gray-700">Kondisi</label>
-              <select name="kondisi" value={formData.kondisi} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors appearance-none bg-white">
+              <select name="kondisi" value={formData.kondisi} onChange={handleTextChange} className={`w-full border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors appearance-none bg-white ${formError.includes("Kondisi") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`}>
                 <option value=""></option>
                 <option value="Baru">Baru</option>
                 <option value="Bekas">Bekas</option>

@@ -1,13 +1,9 @@
-/** @type {import('next').NextConfig} */
+import type { NextConfig } from "next";
+
 const nextConfig = {
-  eslint: {
-    // Membungkam error ESLint merah-merah saat build ke Vercel
-    ignoreDuringBuilds: true,
-  },
   typescript: {
-    // Membungkam error tipe data any/typescript saat build
     ignoreBuildErrors: true,
   },
-};
+} satisfies NextConfig;
 
 export default nextConfig;

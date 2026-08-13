@@ -3,34 +3,27 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../utils/supabase";
+import { countries } from "../../../../utils/countries";
 
-// --- DATA NEGARA ---
-const countries = [
-  { name: "Afganistan", code: "af" }, { name: "Afrika Selatan", code: "za" }, { name: "Albania", code: "al" }, { name: "Aljazair", code: "dz" }, { name: "Amerika Serikat (AS)", code: "us" }, { name: "Andorra", code: "ad" }, { name: "Angola", code: "ao" }, { name: "Antigua dan Barbuda", code: "ag" }, { name: "Arab Saudi", code: "sa" }, { name: "Argentina", code: "ar" }, { name: "Australia", code: "au" }, { name: "Austria", code: "at" },
-  { name: "Bahama", code: "bs" }, { name: "Bahrain", code: "bh" }, { name: "Bangladesh", code: "bd" }, { name: "Barbados", code: "bb" }, { name: "Belarus", code: "by" }, { name: "Belgia", code: "be" }, { name: "Belize", code: "bz" }, { name: "Benin", code: "bj" }, { name: "Bhutan", code: "bt" }, { name: "Bolivia", code: "bo" }, { name: "Bosnia dan Herzegovina", code: "ba" }, { name: "Botswana", code: "bw" }, { name: "Brasil", code: "br" }, { name: "Brunei Darussalam", code: "bn" }, { name: "Bulgaria", code: "bg" }, { name: "Burkina Faso", code: "bf" }, { name: "Burundi", code: "bi" },
-  { name: "Ceko", code: "cz" }, { name: "Chad", code: "td" }, { name: "Chili", code: "cl" }, { name: "China", code: "cn" },
-  { name: "Denmark", code: "dk" }, { name: "Djibouti", code: "dj" }, { name: "Dominika", code: "dm" },
-  { name: "Ekuador", code: "ec" }, { name: "El Salvador", code: "sv" }, { name: "Eritrea", code: "er" }, { name: "Estonia", code: "ee" }, { name: "Eswatini", code: "sz" }, { name: "Ethiopia", code: "et" },
-  { name: "Fiji", code: "fj" }, { name: "Filipina", code: "ph" }, { name: "Finlandia", code: "fi" },
-  { name: "Gabon", code: "ga" }, { name: "Gambia", code: "gm" }, { name: "Ghana", code: "gh" }, { name: "Grenada", code: "gd" }, { name: "Guatemala", code: "gt" }, { name: "Guinea", code: "gn" }, { name: "Guinea Khatulistiwa", code: "gq" }, { name: "Guinea-Bissau", code: "gw" }, { name: "Guyana", code: "gy" },
-  { name: "Haiti", code: "ht" }, { name: "Honduras", code: "hn" }, { name: "Hungaria", code: "hu" },
-  { name: "India", code: "in" }, { name: "Indonesia", code: "id" }, { name: "Inggris Raya", code: "gb" }, { name: "Irak", code: "iq" }, { name: "Iran", code: "ir" }, { name: "Irlandia", code: "ie" }, { name: "Islandia", code: "is" }, { name: "Israel", code: "il" }, { name: "Italia", code: "it" },
-  { name: "Jamaika", code: "jm" }, { name: "Jepang", code: "jp" }, { name: "Jerman", code: "de" },
-  { name: "Kamboja", code: "kh" }, { name: "Kamerun", code: "cm" }, { name: "Kanada", code: "ca" }, { name: "Kazakhstan", code: "kz" }, { name: "Kenya", code: "ke" }, { name: "Kepulauan Marshall", code: "mh" }, { name: "Kepulauan Solomon", code: "sb" }, { name: "Kirgistan", code: "kg" }, { name: "Kiribati", code: "ki" }, { name: "Kolombia", code: "co" }, { name: "Komoro", code: "km" }, { name: "Kongo", code: "cg" }, { name: "Korea Selatan", code: "kr" }, { name: "Korea Utara", code: "kp" }, { name: "Kosta Rika", code: "cr" }, { name: "Kroasia", code: "hr" }, { name: "Kuba", code: "cu" }, { name: "Kuwait", code: "kw" },
-  { name: "Laos", code: "la" }, { name: "Latvia", code: "lv" }, { name: "Lebanon", code: "lb" }, { name: "Lesotho", code: "ls" }, { name: "Liberia", code: "lr" }, { name: "Libya", code: "ly" }, { name: "Lithuania", code: "lt" }, { name: "Luksemburg", code: "lu" },
-  { name: "Madagaskar", code: "mg" }, { name: "Makedonia Utara", code: "mk" }, { name: "Malawi", code: "mw" }, { name: "Malaysia", code: "my" }, { name: "Maladewa", code: "mv" }, { name: "Mali", code: "ml" }, { name: "Malta", code: "mt" }, { name: "Maroko", code: "ma" }, { name: "Mauritania", code: "mr" }, { name: "Mauritius", code: "mu" }, { name: "Meksiko", code: "mx" }, { name: "Mesir", code: "eg" }, { name: "Mikronesia", code: "fm" }, { name: "Moldova", code: "md" }, { name: "Monako", code: "mc" }, { name: "Mongolia", code: "mn" }, { name: "Montenegro", code: "me" }, { name: "Mozambik", code: "mz" }, { name: "Myanmar", code: "mm" },
-  { name: "Namibia", code: "na" }, { name: "Nauru", code: "nr" }, { name: "Nepal", code: "np" }, { name: "Niger", code: "ne" }, { name: "Nigeria", code: "ng" }, { name: "Nikaragua", code: "ni" }, { name: "Norwegia", code: "no" },
-  { name: "Oman", code: "om" },
-  { name: "Pakistan", code: "pk" }, { name: "Palau", code: "pw" }, { name: "Palestina", code: "ps" }, { name: "Panama", code: "pa" }, { name: "Pantai Gading", code: "ci" }, { name: "Papua Nugini", code: "pg" }, { name: "Paraguay", code: "py" }, { name: "Peru", code: "pe" }, { name: "Polandia", code: "pl" }, { name: "Portugal", code: "pt" }, { name: "Prancis", code: "fr" },
-  { name: "Qatar", code: "qa" },
-  { name: "Republik Afrika Tengah", code: "cf" }, { name: "Republik Demokratik Kongo", code: "cd" }, { name: "Republik Dominika", code: "do" }, { name: "Rumania", code: "ro" }, { name: "Rusia", code: "ru" }, { name: "Rwanda", code: "rw" },
-  { name: "Saint Kitts dan Nevis", code: "kn" }, { name: "Saint Lucia", code: "lc" }, { name: "Saint Vincent dan Grenadines", code: "vc" }, { name: "Samoa", code: "ws" }, { name: "San Marino", code: "sm" }, { name: "Sao Tome dan Principe", code: "st" }, { name: "Selandia Baru", code: "nz" }, { name: "Senegal", code: "sn" }, { name: "Serbia", code: "rs" }, { name: "Seychelles", code: "sc" }, { name: "Sierra Leone", code: "sl" }, { name: "Singapura", code: "sg" }, { name: "Siprus", code: "cy" }, { name: "Slowakia", code: "sk" }, { name: "Slovenia", code: "si" }, { name: "Somalia", code: "so" }, { name: "Spanyol", code: "es" }, { name: "Sri Lanka", code: "lk" }, { name: "Sudan", code: "sd" }, { name: "Sudan Selatan", code: "ss" }, { name: "Suriah", code: "sy" }, { name: "Suriname", code: "sr" }, { name: "Swedia", code: "se" }, { name: "Swiss", code: "ch" },
-  { name: "Taiwan", code: "tw" }, { name: "Tajikistan", code: "tj" }, { name: "Tanjung Verde", code: "cv" }, { name: "Tanzania", code: "tz" }, { name: "Thailand", code: "th" }, { name: "Timor Leste", code: "tl" }, { name: "Tiongkok (China)", code: "cn" }, { name: "Togo", code: "tg" }, { name: "Tonga", code: "to" }, { name: "Trinidad dan Tobago", code: "tt" }, { name: "Tunisia", code: "tn" }, { name: "Turki", code: "tr" }, { name: "Turkmenistan", code: "tm" }, { name: "Tuvalu", code: "tv" },
-  { name: "Uganda", code: "ug" }, { name: "Ukraina", code: "ua" }, { name: "Uni Emirat Arab (UEA)", code: "ae" }, { name: "Uruguay", code: "uy" }, { name: "Uzbekistan", code: "uz" },
-  { name: "Vanuatu", code: "vu" }, { name: "Vatikan", code: "va" }, { name: "Venezuela", code: "ve" }, { name: "Vietnam", code: "vn" },
-  { name: "Yaman", code: "ye" }, { name: "Yordania", code: "jo" }, { name: "Yunani", code: "gr" },
-  { name: "Zambia", code: "zm" }, { name: "Zimbabwe", code: "zw" }
-];
+// --- INTERFACE MACHINE YANG LEBIH AMAN ---
+export interface Machine {
+  id: number;
+  product_id: string;
+  serial_number: string | null;
+  nama_mesin: string | null;
+  nama_klien: string | null;
+  kategori: string | null;
+  pabrikan: string | null;
+  negara_asal: string | null;
+  tahun_pembuatan: string | null;
+  kondisi: string | null;
+  tanggal_serah_terima: string | null;
+  foto_mesin: string | null;
+  buku_manual: string | null;
+  qr_code: string | null;
+  is_deleted: boolean;
+  created_at: string;
+}
 
 const getCountryFlagCode = (countryName: string) => {
   if (!countryName) return null;
@@ -38,13 +31,12 @@ const getCountryFlagCode = (countryName: string) => {
   return found ? found.code : null;
 };
 
-// --- FUNGSI BARU (POIN 9): Ngambil Nama Asli dari Cookie ---
 const getActiveUserName = () => {
   if (typeof document !== 'undefined') {
     const match = document.cookie.match(new RegExp('(^| )user_name=([^;]+)'));
     if (match) return decodeURIComponent(match[2]);
   }
-  return "Sistem Admin"; // Fallback kalau gak ketemu
+  return "Sistem Admin"; 
 };
 
 export default function InventoryPage() {
@@ -61,11 +53,11 @@ export default function InventoryPage() {
   const [sortColumn, setSortColumn] = useState<string>("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
-  const [machines, setMachines] = useState<any[]>([]);
+  const [machines, setMachines] = useState<Machine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedMachine, setSelectedMachine] = useState<any>(null);
+  const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   
   const [isSaving, setIsSaving] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "success" | "partial_error">("idle");
@@ -73,7 +65,7 @@ export default function InventoryPage() {
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: "", nama: "" });
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: 0, nama: "" });
   const [deleteStatus, setDeleteStatus] = useState<"idle" | "deleting" | "success">("idle");
 
   const [editFotoFile, setEditFotoFile] = useState<File | null>(null);
@@ -120,11 +112,11 @@ export default function InventoryPage() {
       .eq("is_deleted", false) 
       .order("created_at", { ascending: false });
       
-    if (!error) setMachines(data || []);
+    if (!error) setMachines((data as Machine[]) || []);
     setIsLoading(false);
   };
 
-  const handleOpenOptions = (machine: any) => {
+  const handleOpenOptions = (machine: Machine) => {
     setSelectedMachine(machine);
     setEditFotoFile(null); 
     setEditManualFile(null);
@@ -211,8 +203,7 @@ export default function InventoryPage() {
     let hasWoError = false;
 
     if (editFormData.next_service && !updateError) {
-      // --- FUNGSI BARU (POIN 8): Generate ID WO Pakai Timestamp Biar Anti-Kembar ---
-      const uniqueTimestamp = Date.now().toString().slice(-6); // Ambil 6 digit terakhir dari millisecond
+      const uniqueTimestamp = Date.now().toString().slice(-6); 
       const woNumber = `WO-${new Date().getFullYear()}-${uniqueTimestamp}`;
       
       const { error: woInsertError } = await supabase
@@ -255,7 +246,7 @@ export default function InventoryPage() {
 
   const triggerDelete = () => {
     if (!selectedMachine) return;
-    setDeleteModal({ isOpen: true, id: selectedMachine.id, nama: selectedMachine.nama_mesin });
+    setDeleteModal({ isOpen: true, id: selectedMachine.id, nama: selectedMachine.nama_mesin || "Mesin ini" });
     setDeleteStatus("idle");
   };
 
@@ -272,7 +263,6 @@ export default function InventoryPage() {
     } else {
       setDeleteStatus("success");
       
-      // --- PERBAIKAN POIN 9: Ambil actor_name dari Cookie (Bukan hardcode) ---
       const currentUserName = getActiveUserName();
 
       await supabase.from("activity_logs").insert([{
@@ -282,14 +272,15 @@ export default function InventoryPage() {
       }]);
 
       setTimeout(() => {
-        setDeleteModal({ isOpen: false, id: "", nama: "" });
+        setDeleteModal({ isOpen: false, id: 0, nama: "" });
         setIsEditModalOpen(false); 
         fetchMachines();
       }, 1500);
     }
   };
 
-  const handleDownloadPhoto = async (url: string, filename: string) => {
+  // --- SOLUSI: Terima URL null/undefined agar TS gak ngamuk ---
+  const handleDownloadPhoto = async (url: string | null | undefined, filename: string) => {
     if (!url) return;
     try {
       const response = await fetch(url);
@@ -328,8 +319,18 @@ export default function InventoryPage() {
 
   if (sortColumn) {
     processedMachines.sort((a, b) => {
-      const dbColMap: any = { "Nama Mesin": "nama_mesin", "Kategori": "kategori", "Pabrikan": "pabrikan", "Asal": "negara_asal", "Tahun": "tahun_pembuatan", "Kondisi": "kondisi" };
-      const colName = dbColMap[sortColumn];
+      const dbColMap: Record<string, keyof Machine> = { 
+        "Nama Mesin": "nama_mesin", 
+        "Kategori": "kategori", 
+        "Pabrikan": "pabrikan", 
+        "Asal": "negara_asal", 
+        "Tahun": "tahun_pembuatan", 
+        "Kondisi": "kondisi" 
+      };
+      
+      const colName = dbColMap[sortColumn] as keyof Machine;
+      if (!colName) return 0;
+      
       const valA = (a[colName] || "").toString().toLowerCase();
       const valB = (b[colName] || "").toString().toLowerCase();
       if (valA < valB) return sortOrder === "asc" ? -1 : 1;
@@ -482,8 +483,8 @@ export default function InventoryPage() {
                 </tr>
               ) : (
                 processedMachines.map((machine) => {
-                  const pabrikanFlag = getCountryFlagCode(machine.pabrikan);
-                  const asalFlag = getCountryFlagCode(machine.negara_asal);
+                  const pabrikanFlag = getCountryFlagCode(machine.pabrikan || "");
+                  const asalFlag = getCountryFlagCode(machine.negara_asal || "");
 
                   return (
                     <tr key={machine.id} className="hover:bg-gray-50/50 transition-colors">
@@ -857,7 +858,7 @@ export default function InventoryPage() {
                 
                 <div className="flex justify-center gap-3">
                   <button 
-                    onClick={() => setDeleteModal({ isOpen: false, id: "", nama: "" })} 
+                    onClick={() => setDeleteModal({ isOpen: false, id: 0, nama: "" })} 
                     disabled={deleteStatus === "deleting"} 
                     className="px-6 py-2.5 text-[13px] font-bold text-gray-600 bg-gray-100 rounded-[10px] hover:bg-gray-200 transition-colors w-full"
                   >
