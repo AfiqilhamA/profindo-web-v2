@@ -26,23 +26,6 @@ export default function GuestPage() {
   // LOGIKA LIVE KAMERA
   // ==========================================
   useEffect(() => {
-    if (localStorage.getItem("user_role") !== "Guest") {
-      router.push("/login");
-    }
-
-    const handlePopState = () => {
-      localStorage.removeItem("user_name");
-      localStorage.removeItem("user_role");
-      router.replace("/login");
-    };
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [router]);
-
-  useEffect(() => {
     let scanner: Html5Qrcode | null = null;
 
     if (appState === "scanning_live") {
@@ -152,10 +135,16 @@ export default function GuestPage() {
   };
   const today = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Fungsi Keluar Langsung (Instant Logout)
+  // Fungsi Keluar Langsung (Instant Logout & Hapus Cookie!)
   const handleLogout = () => {
-    localStorage.removeItem("user_name");
-    localStorage.removeItem("user_role");
+    // 1. Hapus Cookie Guest biar nggak nyangkut di proxy.ts
+    document.cookie = "user_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    document.cookie = "user_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    
+    // 2. Bersihin localStorage
+    localStorage.clear();
+    
+    // 3. Balik ke halaman login
     router.push("/login");
   };
 

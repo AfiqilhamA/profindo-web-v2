@@ -1,4 +1,9 @@
-export const countries = [
+export interface Country {
+  name: string;
+  code: string;
+}
+
+export const countries: Country[] = [
   { name: "Afganistan", code: "af" }, { name: "Afrika Selatan", code: "za" }, { name: "Albania", code: "al" }, { name: "Aljazair", code: "dz" }, { name: "Amerika Serikat (AS)", code: "us" }, { name: "Andorra", code: "ad" }, { name: "Angola", code: "ao" }, { name: "Antigua dan Barbuda", code: "ag" }, { name: "Arab Saudi", code: "sa" }, { name: "Argentina", code: "ar" }, { name: "Australia", code: "au" }, { name: "Austria", code: "at" },
   { name: "Bahama", code: "bs" }, { name: "Bahrain", code: "bh" }, { name: "Bangladesh", code: "bd" }, { name: "Barbados", code: "bb" }, { name: "Belarus", code: "by" }, { name: "Belgia", code: "be" }, { name: "Belize", code: "bz" }, { name: "Benin", code: "bj" }, { name: "Bhutan", code: "bt" }, { name: "Bolivia", code: "bo" }, { name: "Bosnia dan Herzegovina", code: "ba" }, { name: "Botswana", code: "bw" }, { name: "Brasil", code: "br" }, { name: "Brunei Darussalam", code: "bn" }, { name: "Bulgaria", code: "bg" }, { name: "Burkina Faso", code: "bf" }, { name: "Burundi", code: "bi" },
   { name: "Ceko", code: "cz" }, { name: "Chad", code: "td" }, { name: "Chili", code: "cl" }, { name: "China", code: "cn" },
@@ -24,3 +29,9 @@ export const countries = [
   { name: "Yaman", code: "ye" }, { name: "Yordania", code: "jo" }, { name: "Yunani", code: "gr" },
   { name: "Zambia", code: "zm" }, { name: "Zimbabwe", code: "zw" }
 ];
+
+export const getCountryFlagCode = (countryName: string): string | null => {
+  if (!countryName) return null;
+  const found = countries.find(c => c.name.toLowerCase() === countryName.trim().toLowerCase());
+  return found ? found.code : null;
+};

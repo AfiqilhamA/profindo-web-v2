@@ -15,32 +15,15 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState("");
 
   // ==========================================
-  // CEK SESI OTOMATIS PAKAI SUPABASE AUTH
+  // FITUR: SATPAM SESI (STANDAR BARU RANEL)
   // ==========================================
   useEffect(() => {
-    const checkActiveSession = async () => {
-      // Cek apakah ada sesi resmi dari Supabase Auth
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Ambil role dari Cookie yang nanti kita set saat login
-      const cookies = document.cookie.split("; ");
-      const roleCookie = cookies.find(row => row.startsWith("user_role="));
-      const activeRole = roleCookie ? roleCookie.split("=")[1] : null;
-
-      if (session && activeRole) {
-        if (activeRole === "Admin") {
-          router.push("/dashboard/admin");
-        } else if (activeRole === "Technician") {
-          router.push("/technician"); 
-        }
-      } else if (activeRole === "Guest") {
-        // Kalau guest maksa balik ke login, kita bersihin cookienya
-        document.cookie = "user_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        document.cookie = "user_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      }
-    };
-
-    checkActiveSession();
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return; // Kalau guest, biarin aja lewat, nggak usah ditendang
+      const { data: profile } = await supabase.from("technicians").select("role").eq("email", user.email ?? "").maybeSingle();
+      if (profile?.role?.toLowerCase().includes("admin")) router.push("/dashboard/admin");
+      else if (profile) router.push("/technician");
+    });
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -49,36 +32,22 @@ export default function LoginPage() {
     setErrorMsg("");
 
     try {
-      // 1. LOGIN PAKAI SUPABASE AUTH (SANGAT AMAN)
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
+      // 1. LOGIN LEWAT API RANEL (Biar Proxy.ts ngebaca Cookie SSR-nya!)
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-
-      if (authError || !authData.user) {
-        setErrorMsg("Email atau Password salah!");
+      const result = await response.json();
+      
+      if (!response.ok) {
+        setErrorMsg(result.error || "Email atau Password salah!");
         setIsLoading(false);
         return;
       }
 
-      // 2. AMBIL DATA ROLE DARI TABEL TECHNICIANS
-      const { data: techData, error: techError } = await supabase
-        .from("technicians")
-        .select("*")
-        .eq("email", email)
-        .eq("is_deleted", false) 
-        .single(); 
-
-      if (techError || !techData) {
-        // Kalau user ada di Auth tapi nggak ada di tabel technicians (atau dihapus)
-        await supabase.auth.signOut();
-        setErrorMsg("Akun tidak ditemukan atau telah dinonaktifkan.");
-        setIsLoading(false);
-        return;
-      }
-
-      // 3. VALIDASI TAB & ROLE
-      const userRoleLower = (techData.role || "").toLowerCase();
+      const data = result;
+      const userRoleLower = (data.role || "").toLowerCase();
       const isActuallyAdmin = userRoleLower.includes("admin");
       
       if (activeTab === "admin" && !isActuallyAdmin) {
@@ -94,19 +63,9 @@ export default function LoginPage() {
         return;
       }
 
-      // 4. SIMPAN ROLE KE COOKIES (Biar bisa dibaca sama Middleware Next.js)
-      // Pakai cookie supaya aman dan terkirim ke server tiap kali pindah halaman
-      document.cookie = `user_role=${techData.role}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `user_name=${techData.nama_lengkap}; path=/; max-age=86400; SameSite=Lax`;
-      
-      if (techData.foto_profil) {
-        document.cookie = `admin_avatar=${techData.foto_profil}; path=/; max-age=86400; SameSite=Lax`;
-      }
-
-      // Hapus sisa-sisa localStorage lama biar bersih
+      // Bersihin sisa-sisa lokal biar nggak bentrok
       localStorage.clear();
 
-      // 5. REDIRECT SESUAI ROLE
       if (isActuallyAdmin) {
         router.push("/dashboard/admin");
       } else {
@@ -122,10 +81,11 @@ export default function LoginPage() {
   };
 
   const handleGuestLogin = () => {
-    // Guest cukup pakai Cookie sederhana tanpa perlu Auth Database
-    document.cookie = `user_role=Guest; path=/; max-age=86400; SameSite=Lax`;
-    document.cookie = `user_name=Guest / Pelanggan; path=/; max-age=86400; SameSite=Lax`;
+    // Guest nggak butuh API auth, langsung arahin ke halamannya
+    // (Biarin Guest pakai localStorage buat nama tampilannya aja)
     localStorage.clear();
+    localStorage.setItem("user_name", "Guest / Pelanggan");
+    localStorage.setItem("user_role", "Guest");
     router.push("/guest");
   };
 
