@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../utils/supabase";
 import { countries } from "../../../../utils/countries";
+import { generateUniqueWoNumber } from "../../../../utils/woNumber"; // <-- IMPORT FUNGSI WO BARU
 
 // --- INTERFACE MACHINE YANG LEBIH AMAN ---
 export interface Machine {
@@ -203,8 +204,8 @@ export default function InventoryPage() {
     let hasWoError = false;
 
     if (editFormData.next_service && !updateError) {
-      const uniqueTimestamp = Date.now().toString().slice(-6); 
-      const woNumber = `WO-${new Date().getFullYear()}-${uniqueTimestamp}`;
+      // --- PERUBAHAN DI SINI: Pakai generateUniqueWoNumber ---
+      const woNumber = await generateUniqueWoNumber();
       
       const { error: woInsertError } = await supabase
         .from("work_orders")
@@ -279,7 +280,6 @@ export default function InventoryPage() {
     }
   };
 
-  // --- SOLUSI: Terima URL null/undefined agar TS gak ngamuk ---
   const handleDownloadPhoto = async (url: string | null | undefined, filename: string) => {
     if (!url) return;
     try {

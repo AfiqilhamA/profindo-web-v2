@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabase"; 
-import { Html5Qrcode } from "html5-qrcode"; // Ganti pakai ini biar UI kameranya bisa dicustom
+import { Html5Qrcode } from "html5-qrcode";
 
 export default function TechnicianPage() {
   const router = useRouter();
@@ -29,13 +29,32 @@ export default function TechnicianPage() {
   const [foto, setFoto] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ==========================================
+  // LOGIKA CEK SESI & AMBIL NAMA TEKNISI DARI DB
+  // ==========================================
   useEffect(() => {
-    const name = localStorage.getItem("user_name");
-    if (name) setTechName(name);
+    const checkUserSession = async () => {
+      // 1. Cek sesi asli dari Supabase
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error || !user) {
+        router.push("/login");
+        return;
+      }
 
-    if (!localStorage.getItem("user_role")) {
-      router.push("/login");
-    }
+      // 2. Ambil nama lengkap dari database berdasarkan email yang login
+      const { data: techData } = await supabase
+        .from("technicians")
+        .select("nama_lengkap")
+        .eq("email", user.email ?? "")
+        .maybeSingle();
+
+      if (techData && techData.nama_lengkap) {
+        setTechName(techData.nama_lengkap);
+      }
+    };
+
+    checkUserSession();
   }, [router]);
 
   // ==========================================
@@ -75,7 +94,19 @@ export default function TechnicianPage() {
     };
   }, [appState]);
 
-  const confirmLogout = () => {
+  // ==========================================
+  // FUNGSI LOGOUT YANG BENAR (HAPUS AUTH & COOKIE)
+  // ==========================================
+  const confirmLogout = async () => {
+    // 1. Sign out dari Supabase
+    await supabase.auth.signOut();
+
+    // 2. Bersihin Cookie SSR biar proxy.ts tau kita udah keluar
+    document.cookie = "user_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    document.cookie = "user_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    document.cookie = "admin_avatar=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    
+    // 3. Bersihin sisa lokal
     localStorage.clear();
     router.push("/login");
   };

@@ -42,7 +42,7 @@ export default function ServiceHistoryPage() {
 
   const fetchData = async () => {
     setIsLoading(true);
-    const { data: machineData } = await supabase.from("machines").select("*").eq("id", machineId).single();
+    const { data: machineData } = await supabase.from("machines").select("*").eq("id", machineId).eq("is_deleted", false).single();
     if (machineData) setMachine(machineData);
 
     const { data: serviceData } = await supabase.from("machine_services").select("*").eq("machine_id", machineId).order("tanggal", { ascending: true });
