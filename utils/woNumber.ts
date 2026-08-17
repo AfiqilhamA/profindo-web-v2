@@ -26,7 +26,9 @@ export async function generateUniqueWoNumber(attempt = 0): Promise<string> {
     const last = data?.[0]?.wo_number?.split("-").pop();
     const lastSeq = Number.parseInt(last ?? "0", 10);
     const baseSeq = Number.isNaN(lastSeq) ? 0 : lastSeq;
-    const nextSeq = baseSeq + 1 + attempt;
+    // For retries (attempt > 0), add a random jitter offset (1..20) + attempt to break lockstep alignment between concurrent callers
+    const randomJitter = attempt > 0 ? Math.floor(Math.random() * 20) + 1 : 0;
+    const nextSeq = baseSeq + 1 + attempt + randomJitter;
     return `${prefix}${String(nextSeq).padStart(4, "0")}`;
   } catch (err) {
     console.error("Error generating wo_number:", err);
