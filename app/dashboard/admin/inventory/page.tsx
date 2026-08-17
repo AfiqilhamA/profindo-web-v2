@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../utils/supabase";
-import { countries } from "../../../../utils/countries";
+import { countries, getCountryFlagCode } from "../../../../utils/countries";
+import { generateUniqueWoNumber } from "../../../../utils/woNumber";
 
 // --- INTERFACE MACHINE YANG LEBIH AMAN ---
 export interface Machine {
@@ -24,12 +25,6 @@ export interface Machine {
   is_deleted: boolean;
   created_at: string;
 }
-
-const getCountryFlagCode = (countryName: string) => {
-  if (!countryName) return null;
-  const found = countries.find(c => c.name.toLowerCase() === countryName.trim().toLowerCase());
-  return found ? found.code : null;
-};
 
 const getActiveUserName = () => {
   if (typeof document !== 'undefined') {
@@ -144,103 +139,118 @@ export default function InventoryPage() {
     setIsSaving(true);
     setWoErrorMessage("");
 
-    let fotoUrl = selectedMachine.foto_mesin;
-    let manualUrl = selectedMachine.buku_manual;
+    try {
+      let fotoUrl = selectedMachine.foto_mesin;
+      let manualUrl = selectedMachine.buku_manual;
 
-    if (editFotoFile) {
-      const fileExt = editFotoFile.name.split('.').pop();
-      const fileName = `${Date.now()}-foto.${fileExt}`;
-      const { data, error: fotoError } = await supabase.storage.from('machine_files').upload(`foto/${fileName}`, editFotoFile);
-      
-      if (fotoError) {
-        alert("Gagal mengupload foto baru: " + fotoError.message);
-        setIsSaving(false);
-        return; 
+      if (editFotoFile) {
+        const fileExt = editFotoFile.name.split('.').pop();
+        const fileName = `${Date.now()}-foto.${fileExt}`;
+        const { data, error: fotoError } = await supabase.storage.from('machine_files').upload(`foto/${fileName}`, editFotoFile);
+        
+        if (fotoError) {
+          alert("Gagal mengupload foto baru: " + fotoError.message);
+          return; 
+        }
+        if (data) {
+          const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`foto/${fileName}`);
+          fotoUrl = pubUrl.publicUrl;
+        }
       }
-      if (data) {
-        const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`foto/${fileName}`);
-        fotoUrl = pubUrl.publicUrl;
+
+      if (editManualFile) {
+        const fileExt = editManualFile.name.split('.').pop();
+        const fileName = `${Date.now()}-manual.${fileExt}`;
+        const { data, error: manualError } = await supabase.storage.from('machine_files').upload(`manual/${fileName}`, editManualFile);
+        
+        if (manualError) {
+          alert("Gagal mengupload buku manual baru: " + manualError.message);
+          return; 
+        }
+        if (data) {
+          const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`manual/${fileName}`);
+          manualUrl = pubUrl.publicUrl;
+        }
       }
-    }
 
-    if (editManualFile) {
-      const fileExt = editManualFile.name.split('.').pop();
-      const fileName = `${Date.now()}-manual.${fileExt}`;
-      const { data, error: manualError } = await supabase.storage.from('machine_files').upload(`manual/${fileName}`, editManualFile);
-      
-      if (manualError) {
-        alert("Gagal mengupload buku manual baru: " + manualError.message);
-        setIsSaving(false);
-        return; 
+      const { error: updateError } = await supabase.from("machines").update({
+        product_id: editFormData.product_id, 
+        serial_number: editFormData.serial_number,
+        nama_mesin: editFormData.nama_mesin, 
+        nama_klien: editFormData.nama_klien, 
+        kategori: editFormData.kategori,
+        pabrikan: editFormData.pabrikan, 
+        negara_asal: editFormData.negara_asal,
+        tahun_pembuatan: editFormData.tahun_pembuatan, 
+        kondisi: editFormData.kondisi,
+        tanggal_serah_terima: editFormData.tanggal_serah_terima,
+        foto_mesin: fotoUrl, 
+        buku_manual: manualUrl
+      }).eq("id", selectedMachine.id);
+
+      if (updateError) {
+        alert("Gagal memperbarui data mesin: " + updateError.message);
+        return;
       }
-      if (data) {
-        const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`manual/${fileName}`);
-        manualUrl = pubUrl.publicUrl;
-      }
-    }
 
-    const { error: updateError } = await supabase.from("machines").update({
-      product_id: editFormData.product_id, 
-      serial_number: editFormData.serial_number,
-      nama_mesin: editFormData.nama_mesin, 
-      nama_klien: editFormData.nama_klien, 
-      kategori: editFormData.kategori,
-      pabrikan: editFormData.pabrikan, 
-      negara_asal: editFormData.negara_asal,
-      tahun_pembuatan: editFormData.tahun_pembuatan, 
-      kondisi: editFormData.kondisi,
-      tanggal_serah_terima: editFormData.tanggal_serah_terima,
-      foto_mesin: fotoUrl, 
-      buku_manual: manualUrl
-    }).eq("id", selectedMachine.id);
+      let hasWoError = false;
 
-    if (updateError) {
-      alert("Gagal memperbarui data mesin: " + updateError.message);
-      setIsSaving(false);
-      return;
-    }
+      if (editFormData.next_service) {
+        let inserted = false;
+        let lastErrorMsg = "";
 
-    let hasWoError = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const woNumber = await generateUniqueWoNumber(attempt);
+            const { error: woInsertError } = await supabase
+              .from("work_orders")
+              .insert([
+                {
+                  wo_number: woNumber,
+                  machine_id: selectedMachine.id,             
+                  jadwal_mulai: editFormData.next_service,    
+                  status: "Open",
+                  judul_pekerjaan: "Servis Berkala Otomatis",
+                  deskripsi: "Jadwal servis otomatis dari form edit inventory."
+                }
+              ]);
 
-    if (editFormData.next_service && !updateError) {
-      const uniqueTimestamp = Date.now().toString().slice(-6); 
-      const woNumber = `WO-${new Date().getFullYear()}-${uniqueTimestamp}`;
-      
-      const { error: woInsertError } = await supabase
-        .from("work_orders")
-        .insert([
-          {
-            wo_number: woNumber,
-            machine_id: selectedMachine.id,             
-            jadwal_mulai: editFormData.next_service,    
-            status: "Open",
-            judul_pekerjaan: "Servis Berkala Otomatis",
-            deskripsi: "Jadwal servis otomatis dari form edit inventory."
+            if (!woInsertError) {
+              inserted = true;
+              break;
+            }
+
+            lastErrorMsg = woInsertError.message;
+          } catch (err: any) {
+            lastErrorMsg = err?.message || "Gagal membuat Work Order.";
           }
-        ]);
+        }
 
-      if (woInsertError) {
-        hasWoError = true;
-        setWoErrorMessage(woInsertError.message);
+        if (!inserted) {
+          hasWoError = true;
+          setWoErrorMessage(lastErrorMsg || "Gagal membuat Work Order otomatis.");
+        }
       }
-    }
 
-    setIsSaving(false);
-
-    if (hasWoError) {
-      setUpdateStatus("partial_error"); 
-      fetchMachines();
-      setTimeout(() => {
-        setUpdateStatus("idle");
-        setIsEditModalOpen(false);
-      }, 4000); 
-    } else {
-      setUpdateStatus("success"); 
-      fetchMachines(); 
-      setTimeout(() => {
-        setUpdateStatus("idle");
-        setIsEditModalOpen(false);
-      }, 1500);
+      if (hasWoError) {
+        setUpdateStatus("partial_error"); 
+        fetchMachines();
+        setTimeout(() => {
+          setUpdateStatus("idle");
+          setIsEditModalOpen(false);
+        }, 4000); 
+      } else {
+        setUpdateStatus("success"); 
+        fetchMachines(); 
+        setTimeout(() => {
+          setUpdateStatus("idle");
+          setIsEditModalOpen(false);
+        }, 1500);
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan tidak terduga saat menyimpan: " + (err?.message || err));
+    } finally {
+      setIsSaving(false);
     }
   };
 

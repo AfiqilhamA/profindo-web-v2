@@ -71,8 +71,14 @@ export default function WorkOrdersPage() {
     setModalMode("add");
     setSelectedWo(null);
     
-    // Pakai fungsi Ranel buat generate WO otomatis
-    const woNumber = await generateUniqueWoNumber();
+    let woNumber = "";
+    try {
+      woNumber = await generateUniqueWoNumber();
+    } catch (err) {
+      console.error("Error generating WO number:", err);
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      woNumber = `WO-${dateStr}-0001`;
+    }
     
     setFormData({
       wo_number: woNumber, 

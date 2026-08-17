@@ -67,7 +67,4 @@ export function validateProductNumber(value: string): boolean {
   return /^[A-Za-z]{2,5}-\d{1,20}$/.test(value.trim());
 }
 
-export function validateYear(value: string | number): boolean {
-  const year = Number(value);
-  return Number.isInteger(year) && year >= 1800 && year <= new Date().getFullYear();
-}
+
