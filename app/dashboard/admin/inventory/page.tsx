@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../utils/supabase";
-import { countries } from "../../../../utils/countries";
+import { countries, getCountryFlagCode } from "../../../../utils/countries";
+import { generateUniqueWoNumber } from "../../../../utils/woNumber";
 
 // --- INTERFACE MACHINE YANG LEBIH AMAN ---
 export interface Machine {
@@ -24,12 +25,6 @@ export interface Machine {
   is_deleted: boolean;
   created_at: string;
 }
-
-const getCountryFlagCode = (countryName: string) => {
-  if (!countryName) return null;
-  const found = countries.find(c => c.name.toLowerCase() === countryName.trim().toLowerCase());
-  return found ? found.code : null;
-};
 
 const getActiveUserName = () => {
   if (typeof document !== 'undefined') {
@@ -203,8 +198,7 @@ export default function InventoryPage() {
     let hasWoError = false;
 
     if (editFormData.next_service && !updateError) {
-      const uniqueTimestamp = Date.now().toString().slice(-6); 
-      const woNumber = `WO-${new Date().getFullYear()}-${uniqueTimestamp}`;
+      const woNumber = await generateUniqueWoNumber();
       
       const { error: woInsertError } = await supabase
         .from("work_orders")

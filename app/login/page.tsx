@@ -65,6 +65,9 @@ export default function LoginPage() {
 
       // Bersihin sisa-sisa lokal biar nggak bentrok
       localStorage.clear();
+      // Simpan identitas login biar portal technician & sidebar/topbar bisa baca
+      localStorage.setItem("user_name", data.name || email);
+      localStorage.setItem("user_role", data.role || "");
 
       if (isActuallyAdmin) {
         router.push("/dashboard/admin");

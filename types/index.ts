@@ -54,22 +54,20 @@ export interface UserProfile {
 }
 
 export interface ActivityLog {
-  id?: string;
+  id?: number;
   actor_name: string;
-  actor_role: string;
-  action_type: string;
-  description: string;
-  target_id?: string;
+  action_text: string;
+  tipe_aktivitas: string;
   created_at?: string;
 }
 
 export interface ServiceRecord {
-  id: string;
-  machine_id: string;
-  tanggal_servis: string;
-  jenis_servis: string;
-  teknisi: string;
-  keterangan?: string;
-  biaya?: number;
+  id: number;
+  machine_id: number;
+  tanggal: string;
+  judul_service: string;
+  detail_pekerjaan?: string | null;
+  pic: string;
+  foto_dokumentasi?: string | null;
   created_at?: string;
 }
