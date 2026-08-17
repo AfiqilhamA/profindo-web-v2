@@ -35,6 +35,12 @@ async function runTests() {
   const mockInvalidImage = new File(["dummy content"], "script.exe", { type: "application/x-msdownload" });
   assert(validateImageFile(mockInvalidImage).isValid === false, "EXE file as image should be invalid");
   console.log("✓ File type validation tests passed");
+  // Test 5: WO Number Generation Format
+  const woNum = await generateUniqueWoNumber();
+  assert(/^WO-\d{8}-\d{4}$/.test(woNum), `WO number '${woNum}' should match format WO-YYYYMMDD-XXXX`);
+  const woNumAttempt = await generateUniqueWoNumber(1);
+  assert(/^WO-\d{8}-\d{4}$/.test(woNumAttempt), `WO number attempt '${woNumAttempt}' should match format WO-YYYYMMDD-XXXX`);
+  console.log("✓ WO number generation tests passed");
 
   console.log("\nAll unit & regression tests passed successfully!");
 }
