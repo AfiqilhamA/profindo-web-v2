@@ -10,13 +10,14 @@ returns boolean language sql stable security definer set search_path = public as
   );
 $$;
 
+-- 1. NYALAIN GEMBOK (RLS) DI SEMUA TABEL
 alter table if exists public.machines enable row level security;
 alter table if exists public.work_orders enable row level security;
 alter table if exists public.activity_logs enable row level security;
 alter table if exists public.machine_services enable row level security;
 alter table if exists public.technicians enable row level security;
 
--- Remove permissive policies before recreating them.
+-- 2. HAPUS POLICY LAMA BIAR BERSIH
 do $$ declare p record; begin
   for p in select policyname, tablename from pg_policies where schemaname = 'public'
     and tablename in ('machines','work_orders','activity_logs','machine_services','technicians') loop
@@ -24,45 +25,15 @@ do $$ declare p record; begin
   end loop;
 end $$;
 
-create policy machines_read on public.machines for select to authenticated
-  using (coalesce(is_deleted, false) = false or public.is_admin());
+-- 3. POLICY MACHINES (Guest Boleh Baca, Admin Boleh Edit)
+create policy machines_public_read on public.machines for select 
+  using (coalesce(is_deleted, false) = false);
 create policy machines_admin_write on public.machines for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
-create policy work_orders_read on public.work_orders for select to authenticated
-  using (public.is_admin() or exists (select 1 from public.technicians t where t.id = work_orders.technician_id and lower(t.email) = lower(auth.email())));
-create policy work_orders_admin_write on public.work_orders for all to authenticated
-  using (public.is_admin()) with check (public.is_admin());
-create policy work_orders_technician_update on public.work_orders for update to authenticated
-  using (exists (select 1 from public.technicians t where t.id = work_orders.technician_id and lower(t.email) = lower(auth.email()))) with check (exists (select 1 from public.technicians t where t.id = work_orders.technician_id and lower(t.email) = lower(auth.email())));
-
-create policy activity_logs_admin_read on public.activity_logs for select to authenticated
-  using (public.is_admin());
-create or replace function public.is_current_actor(actor_name text)
-returns boolean language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from public.technicians t
-    where lower(t.email) = lower(auth.email())
-      and coalesce(t.is_deleted, false) = false
-      and t.nama_lengkap = actor_name
-  );
-$$;
-
-create policy activity_logs_authenticated_insert on public.activity_logs for insert to authenticated
-  with check (public.is_admin() or public.is_current_actor(actor_name));
-
-create policy machine_services_read on public.machine_services for select to authenticated
-  using (
-    public.is_admin()
-    or exists (
-      select 1
-      from public.work_orders w
-      join public.technicians t on t.id = w.technician_id
-      where w.machine_id = machine_services.machine_id
-        and lower(t.email) = lower(auth.email())
-        and coalesce(t.is_deleted, false) = false
-    )
-  );
+-- 4. POLICY MACHINE_SERVICES (Guest Boleh Baca Riwayat, Teknisi Boleh Nambah)
+create policy machine_services_public_read on public.machine_services for select 
+  using (true);
 create policy machine_services_write on public.machine_services for insert to authenticated
   with check (
     public.is_admin()
@@ -81,17 +52,48 @@ create policy machine_services_admin_update on public.machine_services for updat
 create policy machine_services_admin_delete on public.machine_services for delete to authenticated
   using (public.is_admin());
 
+-- 5. POLICY WORK ORDERS (Digembok Rapat, Khusus Internal)
+create policy work_orders_read on public.work_orders for select to authenticated
+  using (public.is_admin() or exists (select 1 from public.technicians t where t.id = work_orders.technician_id and lower(t.email) = lower(auth.email())));
+create policy work_orders_admin_write on public.work_orders for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+create policy work_orders_technician_update on public.work_orders for update to authenticated
+  using (exists (select 1 from public.technicians t where t.id = work_orders.technician_id and lower(t.email) = lower(auth.email()))) with check (exists (select 1 from public.technicians t where t.id = work_orders.technician_id and lower(t.email) = lower(auth.email())));
+
+-- 6. POLICY ACTIVITY LOGS
+create policy activity_logs_admin_read on public.activity_logs for select to authenticated
+  using (public.is_admin());
+
+create or replace function public.is_current_actor(actor_name text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.technicians t
+    where lower(t.email) = lower(auth.email())
+      and coalesce(t.is_deleted, false) = false
+      and t.nama_lengkap = actor_name
+  );
+$$;
+
+create policy activity_logs_authenticated_insert on public.activity_logs for insert to authenticated
+  with check (public.is_admin() or public.is_current_actor(actor_name));
+
+-- 7. POLICY TECHNICIANS
 create policy technicians_self_read on public.technicians for select to authenticated
   using (lower(email) = lower(auth.email()) or public.is_admin());
 create policy technicians_admin_write on public.technicians for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
--- Safe collision protection. Existing duplicates must be cleaned before this runs.
+-- 8. STORAGE BUCKET POLICIES (machine_files)
+CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING ( bucket_id = 'machine_files' );
+CREATE POLICY "Public Insert Access" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'machine_files' );
+CREATE POLICY "Public Update Access" ON storage.objects FOR UPDATE WITH CHECK ( bucket_id = 'machine_files' );
+
+-- 9. PROTEKSI DUPLIKAT DATA
 create unique index if not exists work_orders_wo_number_unique on public.work_orders (wo_number);
 create unique index if not exists machines_product_id_unique on public.machines (product_id) where product_id is not null;
 create unique index if not exists machines_serial_number_unique on public.machines (serial_number) where serial_number is not null;
 
--- Atomic machine update + optional automatic work order. Adjust column names if the live schema differs.
+-- 10. FUNGSI AUTO-UPDATE MESIN & BIKIN WO
 create or replace function public.update_machine_with_work_order(machine_payload jsonb, work_order_payload jsonb default null)
 returns jsonb language plpgsql security invoker set search_path = public as $$
 declare machine_id uuid; result jsonb;
