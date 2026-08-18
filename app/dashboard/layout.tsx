@@ -12,13 +12,13 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-[#F4F5F7] overflow-hidden">
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
       
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-[#F4F5F7]">
         <Topbar setIsSidebarOpen={setIsSidebarOpen} />
         
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8 relative">
+        <main className="flex-1 overflow-y-auto p-6 lg:px-8 lg:py-6 relative">
           {children}
         </main>
       </div>

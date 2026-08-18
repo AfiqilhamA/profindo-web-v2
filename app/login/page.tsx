@@ -66,6 +66,13 @@ export default function LoginPage() {
       // Bersihin sisa-sisa lokal biar nggak bentrok
       localStorage.clear();
 
+      // =========================================================
+      // FIX BARU: SIMPAN DATA PROFIL KE BRANKAS BROWSER
+      // =========================================================
+      if (data.name) localStorage.setItem("user_name", data.name);
+      if (data.role) localStorage.setItem("user_role", data.role);
+      if (data.avatar) localStorage.setItem("admin_avatar", data.avatar);
+
       if (isActuallyAdmin) {
         router.push("/dashboard/admin");
       } else {

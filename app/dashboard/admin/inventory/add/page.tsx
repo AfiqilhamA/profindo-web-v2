@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../../../../utils/supabase"; 
 import { countries } from "../../../../../utils/countries";
 
-
 // FUNGSI SAKTI: BAKAR TIMESTAMP
 const addTimestampToImage = (file: File): Promise<File> => {
   return new Promise((resolve) => {
@@ -91,7 +90,6 @@ export default function AddMachinePage() {
     status: "confirm"
   });
 
-  // --- STATE BARU: PENYIMPAN PESAN ERROR VALIDASI ---
   const [formError, setFormError] = useState("");
 
   const filteredCountries = countries.filter(country => country.name.toLowerCase().includes(countryQuery.toLowerCase()));
@@ -102,7 +100,7 @@ export default function AddMachinePage() {
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setFormError(""); // Hilangkan error kalau user mulai ngetik lagi
+    setFormError(""); 
   };
 
   const handleFotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,21 +117,24 @@ export default function AddMachinePage() {
     }
   };
 
-  // --- FUNGSI BARU: SATPAM VALIDASI FORM ---
+  // --- FUNGSI VALIDASI UPDATE (KLIEN SEKARANG WAJIB) ---
   const validateForm = () => {
     setFormError("");
     
     if (!idNumber.trim()) return "Angka Product ID wajib diisi.";
     if (!formData.serial_number.trim()) return "Serial Number wajib diisi.";
     if (!formData.nama_mesin.trim()) return "Nama Mesin wajib diisi.";
+    
+    // VALIDASI BARU: Klien Wajib Diisi
+    if (!formData.nama_klien.trim()) return "Nama Klien / Perusahaan wajib diisi.";
+    
     if (!formData.kategori.trim()) return "Kategori wajib diisi.";
     if (!manufacturerQuery.trim()) return "Pabrikan wajib dipilih/diisi.";
     if (!countryQuery.trim()) return "Negara Asal wajib dipilih/diisi.";
     if (!formData.tanggal_serah_terima) return "Tanggal Serah Terima wajib diisi.";
 
-    // Validasi Tahun Pembuatan yang super ketat
     const currentYear = new Date().getFullYear();
-    const yearRegex = /^\d{4}$/; // Harus murni 4 digit angka
+    const yearRegex = /^\d{4}$/; 
     
     if (!formData.tahun_pembuatan.trim()) {
       return "Tahun Pembuatan wajib diisi.";
@@ -148,17 +149,16 @@ export default function AddMachinePage() {
 
     if (!formData.kondisi) return "Kondisi mesin wajib dipilih.";
 
-    return null; // Kalau null berarti LULUS UJI ✅
+    return null; 
   };
 
   const handleGenerateQR = (e?: React.MouseEvent | React.FormEvent) => {
     if (e) e.preventDefault(); 
 
-    // --- PANGGIL SATPAM VALIDASI SEBELUM BIKIN QR ---
     const errorMsg = validateForm();
     if (errorMsg) {
       setFormError(errorMsg);
-      window.scrollTo({ top: 0, behavior: "smooth" }); // Scroll layar ke atas biar error kelihatan
+      window.scrollTo({ top: 0, behavior: "smooth" }); 
       return;
     }
 
@@ -190,7 +190,6 @@ export default function AddMachinePage() {
   const handleSubmitClick = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // --- PANGGIL SATPAM VALIDASI SEBELUM MUNCULIN POP-UP SIMPAN ---
     const errorMsg = validateForm();
     if (errorMsg) {
       setFormError(errorMsg);
@@ -289,7 +288,6 @@ export default function AddMachinePage() {
 
       <form onSubmit={handleSubmitClick} className="bg-white border border-gray-200 rounded-[16px] shadow-sm p-6 sm:p-8">
         
-        {/* --- KOTAK PESAN ERROR JIKA VALIDASI GAGAL --- */}
         {formError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-[10px] flex items-start gap-3 animate-in fade-in zoom-in duration-300">
             <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -337,9 +335,10 @@ export default function AddMachinePage() {
               <input type="text" name="nama_mesin" value={formData.nama_mesin} onChange={handleTextChange} className={`w-full border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors ${formError.includes("Nama Mesin") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`} />
             </div>
 
+            {/* UPDATE: LABEL KLIEN SEKARANG WAJIB (HILANG TULISAN OPSIONAL) */}
             <div className="space-y-1.5">
-              <label className="text-[12px] font-bold text-gray-700">Nama Klien / Perusahaan <span className="text-gray-400 font-normal">(Opsional)</span></label>
-              <input type="text" name="nama_klien" placeholder="Contoh: PT. Maju Jaya" value={formData.nama_klien} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
+              <label className="text-[12px] font-bold text-gray-700">Nama Klien / Perusahaan</label>
+              <input type="text" name="nama_klien" placeholder="Contoh: PT. Maju Jaya" value={formData.nama_klien} onChange={handleTextChange} className={`w-full border rounded-[8px] px-3 py-2.5 text-[13px] outline-none transition-colors ${formError.includes("Klien") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`} />
             </div>
             
             <div className="space-y-1.5 sm:col-span-2">
@@ -359,7 +358,7 @@ export default function AddMachinePage() {
                   onChange={(e) => { setManufacturerQuery(e.target.value); setIsManufacturerOpen(true); setFormError(""); }}
                   onFocus={() => setIsManufacturerOpen(true)}
                   onBlur={() => setTimeout(() => setIsManufacturerOpen(false), 200)}
-                  placeholder="Ketik nama negara..."
+                  placeholder="Ketik nama pabrikan..."
                   className={`w-full border rounded-[8px] ${selectedManufacturerData ? 'pl-10' : 'pl-3'} pr-8 py-2.5 text-[13px] outline-none transition-colors bg-white ${formError.includes("Pabrikan") ? 'border-red-500 bg-red-50/50' : 'border-gray-200 focus:border-black'}`}
                 />
                 <svg className="absolute right-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
