@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const [waTemplate, setWaTemplate] = useState("Halo Bapak/Ibu Klien, berikut kami lampirkan dokumen Riwayat Service untuk mesin terkait. Terima kasih!");
   
   // ==========================================
-  // STATE: COMPANY PROFILE
+  // STATE: COMPANY PROFILE (DATABASE)
   // ==========================================
   const [companyName, setCompanyName] = useState("PT. Profindo Admin");
   const [companyAddress, setCompanyAddress] = useState("Jl. Teknologi No. 88, Jakarta");
@@ -42,28 +42,33 @@ export default function SettingsPage() {
     isOpen: false, type: "", status: "confirm", title: "", desc: ""
   });
 
-  // Load semua data dari local storage pas pertama kali render
+  // Load data pas pertama kali render
   useEffect(() => {
-    // Load Avatar & WA
-    const savedAvatar = localStorage.getItem("admin_avatar");
-    if (savedAvatar) setAvatarPreview(savedAvatar);
-
+    // 1. Load WA dari Local Storage (Khusus WA tetap di browser)
     const activeWa = localStorage.getItem("admin_wa_number");
     if (activeWa) {
       setSavedWaNumber(activeWa);
       setWaNumber(activeWa);
     }
-
-    // Load Template WA
     const savedWaTemplate = localStorage.getItem("admin_wa_template");
     if (savedWaTemplate) setWaTemplate(savedWaTemplate);
 
-    // Load Profil Perusahaan
-    const savedCompanyName = localStorage.getItem("admin_company_name");
-    if (savedCompanyName) setCompanyName(savedCompanyName);
-
-    const savedCompanyAddress = localStorage.getItem("admin_company_address");
-    if (savedCompanyAddress) setCompanyAddress(savedCompanyAddress);
+    // 2. Load Profil Perusahaan dari DATABASE Supabase
+    const fetchCompanyProfile = async () => {
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+        
+      if (data) {
+        setCompanyName(data.company_name || "PT. Profindo");
+        setCompanyAddress(data.address || "");
+        if (data.logo_url) setAvatarPreview(data.logo_url);
+      }
+    };
+    
+    fetchCompanyProfile();
   }, []);
 
   // Tiap kali pindah ke tab Tempat Sampah, tarik data yang kehapus
@@ -96,8 +101,8 @@ export default function SettingsPage() {
     if (e) e.preventDefault();
     let title = ""; let desc = "";
     if (type === "wa") { title = "Simpan Pengaturan WA?"; desc = "Nomor pengirim dan template pesan akan diperbarui."; }
-    else if (type === "company") { title = "Simpan Profil?"; desc = "Nama, alamat, dan logo perusahaan akan diperbarui."; }
-    else if (type === "backup") { title = "Backup Data?"; desc = "Seluruh data sistem akan diunduh dalam format JSON."; }
+    else if (type === "company") { title = "Simpan Profil?"; desc = "Nama, alamat, dan logo perusahaan akan disimpan ke database."; }
+    else if (type === "backup") { title = "Backup Seluruh Data?"; desc = "Data Mesin, WO, Teknisi, dan Log akan diunduh dalam format JSON."; }
     else if (type === "clear_logs") { title = "Kosongkan Log?"; desc = "Semua riwayat aktivitas akan dihapus permanen. Aksi ini tidak dapat dibatalkan."; }
 
     setActionModal({ isOpen: true, type, status: "confirm", title, desc });
@@ -121,45 +126,71 @@ export default function SettingsPage() {
       if (actionModal.type === "wa") {
         await new Promise(resolve => setTimeout(resolve, 1000));
         localStorage.setItem("admin_wa_number", waNumber);
-        localStorage.setItem("admin_wa_template", waTemplate); // Simpan WA Template
+        localStorage.setItem("admin_wa_template", waTemplate);
         setSavedWaNumber(waNumber);
       } 
       else if (actionModal.type === "company") {
+        let newLogoUrl = avatarPreview;
+        
+        // 1. Upload foto baru jika ada
         if (avatarFile) {
           const fileExt = avatarFile.name.split('.').pop();
           const fileName = `avatar-${Date.now()}.${fileExt}`;
           const { data } = await supabase.storage.from('machine_files').upload(`profile/${fileName}`, avatarFile, { upsert: true });
           if (data) {
             const { data: pubUrl } = supabase.storage.from('machine_files').getPublicUrl(`profile/${fileName}`);
-            localStorage.setItem("admin_avatar", pubUrl.publicUrl);
-            setAvatarPreview(pubUrl.publicUrl);
+            newLogoUrl = pubUrl.publicUrl;
+            setAvatarPreview(newLogoUrl);
           }
         }
-        // Simpan Profil ke Local Storage
-        localStorage.setItem("admin_company_name", companyName);
-        localStorage.setItem("admin_company_address", companyAddress);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 2. Simpan profil ke DATABASE (Tabel company_settings)
+        const { error } = await supabase.from('company_settings').upsert({
+          id: 1,
+          company_name: companyName,
+          address: companyAddress,
+          logo_url: newLogoUrl,
+          updated_at: new Date().toISOString()
+        });
+        
+        if (error) throw error;
       } 
       else if (actionModal.type === "clear_logs") {
         const { error } = await supabase.from("activity_logs").delete().neq("id", -1); 
         if (error) throw error;
       } 
       else if (actionModal.type === "backup") {
-        const { data: machines } = await supabase.from("machines").select("*");
-        const { data: workOrders } = await supabase.from("work_orders").select("*");
+        // Tarik semua 5 tabel inti untuk di-backup
+        const [resMachines, resWO, resTechs, resServices, resLogs] = await Promise.all([
+          supabase.from("machines").select("*"),
+          supabase.from("work_orders").select("*"),
+          supabase.from("technicians").select("*"),
+          supabase.from("machine_services").select("*"),
+          supabase.from("activity_logs").select("*")
+        ]);
+
         const backupData = {
           tanggal_backup: new Date().toISOString(),
-          total_mesin: machines?.length || 0,
-          total_work_orders: workOrders?.length || 0,
-          data_mesin: machines,
-          data_work_orders: workOrders
+          statistik: {
+            total_mesin: resMachines.data?.length || 0,
+            total_work_orders: resWO.data?.length || 0,
+            total_teknisi: resTechs.data?.length || 0,
+            total_riwayat_servis: resServices.data?.length || 0,
+            total_log_aktivitas: resLogs.data?.length || 0,
+          },
+          data_mesin: resMachines.data,
+          data_work_orders: resWO.data,
+          data_teknisi: resTechs.data,
+          data_riwayat_servis: resServices.data,
+          data_log_aktivitas: resLogs.data
         };
+        
         const dataStr = JSON.stringify(backupData, null, 2);
         const dataBlob = new Blob([dataStr], { type: "application/json" });
         const url = window.URL.createObjectURL(dataBlob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `Backup_Profindo_${new Date().toLocaleDateString("id-ID").replace(/\//g, "-")}.json`;
+        link.download = `Backup_Profindo_FULL_${new Date().toLocaleDateString("id-ID").replace(/\//g, "-")}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -285,7 +316,7 @@ export default function SettingsPage() {
                     </label>
                   </div>
                   <div>
-                    <h3 className="text-[13px] font-bold text-gray-800">Foto Profil Top Bar</h3>
+                    <h3 className="text-[13px] font-bold text-gray-800">Foto Profil / Logo Perusahaan</h3>
                     <p className="text-[11px] text-gray-500 mt-1">Format JPG atau PNG. Ukuran ideal 200x200px.</p>
                   </div>
                 </div>
@@ -301,7 +332,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex justify-end pt-4 border-t border-gray-100">
-                  <button type="submit" className="w-full md:w-auto bg-black hover:bg-gray-800 text-white px-8 py-3 md:py-2.5 rounded-[8px] text-[13px] font-bold shadow-sm transition-colors">Simpan Profil</button>
+                  <button type="submit" className="w-full md:w-auto bg-black hover:bg-gray-800 text-white px-8 py-3 md:py-2.5 rounded-[8px] text-[13px] font-bold shadow-sm transition-colors">Simpan ke Database</button>
                 </div>
               </form>
             </div>
@@ -335,10 +366,10 @@ export default function SettingsPage() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                       Backup Seluruh Data
                     </h3>
-                    <p className="text-[12px] text-gray-600 mt-1 md:max-w-md">Unduh seluruh data Mesin dan Work Order ke format JSON lokal sebagai cadangan.</p>
+                    <p className="text-[12px] text-gray-600 mt-1 md:max-w-md">Unduh seluruh data (Mesin, WO, Teknisi, Riwayat) ke format JSON lokal sebagai cadangan.</p>
                   </div>
                   <button type="button" onClick={() => triggerAction("backup")} className="w-full md:w-auto shrink-0 bg-[#2D68FF] text-white hover:bg-blue-700 px-6 py-3 md:py-2.5 rounded-[8px] text-[12px] font-bold transition-all shadow-sm">
-                    Download Backup
+                    Download Backup FULL
                   </button>
                 </div>
 

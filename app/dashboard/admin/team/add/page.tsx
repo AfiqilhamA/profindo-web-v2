@@ -7,23 +7,17 @@ import { supabase } from "../../../../../utils/supabase";
 export default function AddTeamPage() {
   const router = useRouter();
 
-  // State untuk Data Teks
+  // State untuk Data Teks (TANPA PASSWORD)
   const [formData, setFormData] = useState({
     nama_lengkap: "",
     email: "",
     username: "",
     no_whatsapp: "",
-    role: "Technician (Lapangan)",
-    password: "",
-    confirm_password: "",
+    role: "Technician (Lapangan)"
   });
 
   // State untuk Foto Profil
   const [fotoFile, setFotoFile] = useState<File | null>(null);
-
-  // State Show/Hide Password
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // --- STATE UNTUK CUSTOM MODAL ---
   const [submitModal, setSubmitModal] = useState<{
@@ -59,16 +53,6 @@ export default function AddTeamPage() {
       return;
     }
 
-    // Validasi 2: Password dan Confirm Password harus persis sama
-    if (formData.password !== formData.confirm_password) {
-      setSubmitModal({ 
-        isOpen: true, 
-        status: "error", 
-        message: "Password dan Confirm Password tidak cocok! Silakan cek kembali ketikan Anda." 
-      });
-      return;
-    }
-
     // Kalau lolos semua validasi, munculin Pop-up Konfirmasi
     setSubmitModal({ isOpen: true, status: "confirm" });
   };
@@ -87,14 +71,13 @@ export default function AddTeamPage() {
         .from('machine_files')
         .upload(`profiles/${fileName}`, fotoFile);
         
-      // PENJAGA PINTU: Cek error upload foto!
       if (uploadError) {
         setSubmitModal({ 
           isOpen: true, 
           status: "error", 
           message: "Gagal mengupload foto profil: " + uploadError.message 
         });
-        return; // STOP! Jangan lanjut masukin data ke tabel database.
+        return; 
       }
 
       if (uploadData) {
@@ -103,7 +86,7 @@ export default function AddTeamPage() {
       }
     }
 
-    // 2. Simpan Data ke Tabel 'technicians'
+    // 2. Simpan Data ke Tabel 'technicians' (TANPA PASSWORD)
     const { error } = await supabase
       .from("technicians")
       .insert([
@@ -113,7 +96,6 @@ export default function AddTeamPage() {
           username: formData.username,
           no_whatsapp: formData.no_whatsapp,
           role: formData.role,
-          password: formData.password,
           foto_profil: fotoUrl,
         }
       ]);
@@ -125,7 +107,6 @@ export default function AddTeamPage() {
         message: "Gagal menambahkan teknisi ke database: " + error.message 
       });
     } else {
-      // 3. Kalau Berhasil, ubah jadi Ceklis Hijau & Redirect
       setSubmitModal({ isOpen: true, status: "success" });
       setTimeout(() => {
         router.push("/dashboard/admin/team"); 
@@ -136,19 +117,20 @@ export default function AddTeamPage() {
   return (
     <div className="animate-in fade-in duration-500 pb-12 w-full relative"> 
       
-      {/* HEADER & TOMBOL BACK */}
       <div className="flex items-center gap-4 mb-6">
         <button onClick={() => router.back()} className="p-2 bg-white border border-gray-200 rounded-[10px] hover:bg-gray-50 transition-colors shadow-sm active:scale-95">
           <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
         </button>
-        <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Tambah Teknisi</h1>
+        <div>
+          <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Tambah Anggota Tim</h1>
+          <p className="text-[12px] text-gray-500 mt-1">Daftarkan profil teknisi/admin baru ke dalam sistem.</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmitClick} className="bg-white border border-gray-200 rounded-[16px] shadow-sm p-6 sm:p-8">
         
-        <h2 className="text-[14px] font-bold text-gray-900 border-b border-gray-200 pb-3 mb-8">Deskripsi</h2>
+        <h2 className="text-[14px] font-bold text-gray-900 border-b border-gray-200 pb-3 mb-8">Informasi Profil</h2>
         
-        {/* AREA UPLOAD FOTO PROFIL */}
         <div className="flex flex-col items-center justify-center mb-10">
           <div className="relative w-28 h-28 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden group shadow-sm">
             {fotoFile ? (
@@ -166,16 +148,13 @@ export default function AddTeamPage() {
           <p className="text-[11px] font-semibold text-gray-400 mt-3">Upload Foto Profil (Rasio 1:1)</p>
         </div>
 
-        {/* GRID FORM INPUT */}
         <div className="space-y-6">
           
-          {/* Baris 1: Nama Lengkap */}
           <div className="space-y-1.5">
             <label className="text-[12px] font-bold text-gray-700">Nama Lengkap</label>
             <input type="text" name="nama_lengkap" required value={formData.nama_lengkap} onChange={handleTextChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors" />
           </div>
 
-          {/* Baris 2: Email & Username */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
               <label className="text-[12px] font-bold text-gray-700">Alamat Email</label>
@@ -187,7 +166,6 @@ export default function AddTeamPage() {
             </div>
           </div>
 
-          {/* Baris 3: No WhatsApp & Role */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
               <label className="text-[12px] font-bold text-gray-700">Nomor WhatsApp</label>
@@ -202,61 +180,34 @@ export default function AddTeamPage() {
               <svg className="absolute right-3 top-[34px] w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
           </div>
-
-          {/* Baris 4: Password & Confirm Password */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            <div className="space-y-1.5 relative">
-              <label className="text-[12px] font-bold text-gray-700">Password</label>
-              <input 
-                type={showPassword ? "text" : "password"} name="password" required value={formData.password} onChange={handleTextChange} 
-                className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors pr-10" 
-              />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-[34px] text-gray-400 hover:text-black transition-colors">
-                {showPassword ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
-                )}
-              </button>
-            </div>
-            
-            <div className="space-y-1.5 relative">
-              <label className="text-[12px] font-bold text-gray-700">Confirm Password</label>
-              <input 
-                type={showConfirmPassword ? "text" : "password"} name="confirm_password" required value={formData.confirm_password} onChange={handleTextChange} 
-                className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black transition-colors pr-10" 
-              />
-              <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-[34px] text-gray-400 hover:text-black transition-colors">
-                {showConfirmPassword ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
-                )}
-              </button>
+          
+          <div className="bg-blue-50 border border-blue-100 rounded-[10px] p-4 flex items-start gap-3 mt-4">
+            <svg className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <div>
+              <p className="text-[13px] font-bold text-blue-900 mb-1">Informasi Login</p>
+              <p className="text-[12px] text-blue-700 leading-relaxed">
+                Kata sandi (password) tidak lagi diatur oleh Admin demi keamanan. Anggota tim baru yang ditambahkan di sini harus membuat password mereka sendiri menggunakan fitur <b>"Sign Up"</b> atau fitur <b>"Lupa Password"</b> di halaman Login dengan email yang sama.
+              </p>
             </div>
           </div>
+
         </div>
 
-        {/* SUBMIT BUTTON */}
-        <div className="mt-10 flex justify-end">
+        <div className="mt-8 flex justify-end">
           <button 
             type="submit"
             className="bg-black hover:bg-gray-800 text-white px-8 py-3 rounded-[10px] text-[13px] font-bold transition-all active:scale-95 shadow-md"
           >
-            Simpan Data
+            Simpan Profil Tim
           </button>
         </div>
       </form>
 
-      {/* ========================================= */}
-      {/* MODAL CUSTOM (KONFIRMASI / ERROR / SUKSES) */}
-      {/* ========================================= */}
       {submitModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[400px] p-8 text-center animate-in zoom-in-95 duration-200">
             
             {submitModal.status === "error" ? (
-              // TAMPILAN 1: ERROR VALIDASI ATAU UPLOAD
               <>
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5 border border-red-200">
                   <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -273,31 +224,28 @@ export default function AddTeamPage() {
                 </button>
               </>
             ) : submitModal.status === "success" ? (
-              // TAMPILAN 2: ANIMASI SUKSES (CEKLIS)
               <div className="flex flex-col items-center justify-center py-4 animate-in zoom-in duration-300">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
                 </div>
                 <h3 className="text-[18px] font-bold text-gray-900">Berhasil Ditambahkan!</h3>
-                <p className="text-[13px] text-gray-500 mt-2">Data teknisi telah tersimpan ke sistem.</p>
+                <p className="text-[13px] text-gray-500 mt-2">Data anggota tim telah tersimpan ke sistem.</p>
               </div>
             ) : submitModal.status === "saving" ? (
-              // TAMPILAN 3: LOADING SPINNER
               <div className="flex flex-col items-center justify-center py-6">
                 <svg className="animate-spin h-10 w-10 text-[#2D68FF] mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 <h3 className="text-[16px] font-bold text-gray-900">Menyimpan Data...</h3>
                 <p className="text-[12px] text-gray-500 mt-1">Harap tunggu sebentar.</p>
               </div>
             ) : (
-              // TAMPILAN 4: KONFIRMASI SIMPAN
               <>
                 <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5 border border-blue-100">
                   <svg className="w-8 h-8 text-[#2D68FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                 </div>
                 
-                <h3 className="text-[18px] font-bold text-gray-900 mb-2">Simpan Teknisi?</h3>
+                <h3 className="text-[18px] font-bold text-gray-900 mb-2">Simpan Profil Tim?</h3>
                 <p className="text-[13px] text-gray-500 mb-8 leading-relaxed">
-                  Apakah Anda yakin data kelengkapan teknisi ini sudah diisi dengan benar?
+                  Apakah Anda yakin data kelengkapan profil ini sudah diisi dengan benar?
                 </p>
                 
                 <div className="flex justify-center gap-3">
