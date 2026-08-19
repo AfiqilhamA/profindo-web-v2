@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../utils/supabase";// Cek lagi path-nya ya kalau error, sesuaikan sama file aslinya!
+import { supabase } from "../../utils/supabase"; 
 import { Html5Qrcode } from "html5-qrcode";
 
 export default function TechnicianPage() {
@@ -34,7 +34,6 @@ export default function TechnicianPage() {
   // ==========================================
   useEffect(() => {
     const checkUserSession = async () => {
-      // 1. Cek sesi asli dari Supabase
       const { data: { user }, error } = await supabase.auth.getUser();
       
       if (error || !user) {
@@ -42,7 +41,6 @@ export default function TechnicianPage() {
         return;
       }
 
-      // 2. Ambil nama lengkap dari database berdasarkan email yang login
       const { data: techData } = await supabase
         .from("technicians")
         .select("nama_lengkap")
@@ -58,7 +56,7 @@ export default function TechnicianPage() {
   }, [router]);
 
   // ==========================================
-  // LOGIKA LIVE KAMERA (BCA MOBILE STYLE)
+  // LOGIKA LIVE KAMERA
   // ==========================================
   useEffect(() => {
     let scanner: Html5Qrcode | null = null;
@@ -95,7 +93,7 @@ export default function TechnicianPage() {
   }, [appState]);
 
   // ==========================================
-  // FUNGSI LOGOUT YANG BENAR (HAPUS AUTH & COOKIE)
+  // FUNGSI LOGOUT YANG BENAR
   // ==========================================
   const confirmLogout = async () => {
     await supabase.auth.signOut();
@@ -109,7 +107,7 @@ export default function TechnicianPage() {
   };
 
   // ==========================================
-  // LOGIKA UPLOAD QR (BACA GAMBAR BENERAN)
+  // LOGIKA UPLOAD QR
   // ==========================================
   const handleUploadQRClick = () => {
     fileInputRef.current?.click();
@@ -170,9 +168,6 @@ export default function TechnicianPage() {
     }
   };
 
-  // ==========================================
-  // ALUR KIRIM LAPORAN (POP UP 2X KONFIRMASI)
-  // ==========================================
   const handleSubmitClick = (e: React.FormEvent) => {
     e.preventDefault();
     if (!detailPekerjaan) {
@@ -200,7 +195,7 @@ export default function TechnicianPage() {
         }
       }
 
-      // 1. CATAT KE RIWAYAT SERVIS MESIN (Tetap Jalan Normal)
+      // 1. CATAT KE RIWAYAT SERVIS MESIN
       const { error: serviceError } = await supabase.from("machine_services").insert([{
         machine_id: machineData.id,
         tanggal: new Date().toISOString().split('T')[0],
@@ -212,30 +207,28 @@ export default function TechnicianPage() {
 
       if (serviceError) throw serviceError;
 
-      // 2. LOGIKA PINTAR: CEK WORK ORDER YANG LAGI IN PROGRESS BUAT MESIN INI
+      // 2. LOGIKA PINTAR V2: CEK WO YANG LAGI OPEN ATAU IN PROGRESS!
       const { data: activeWo } = await supabase
         .from("work_orders")
         .select("id, wo_number")
         .eq("machine_id", machineData.id)
-        .eq("status", "In Progress")
+        .in("status", ["Open", "In Progress"]) // <--- TOLERANSI BUAT ADMIN YANG LUPA KLIK
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (activeWo) {
-        // Kalau ketemu WO nya, ubah statusnya jadi Pending Review
+        // Kalau ketemu WO nya (baik Open/In Progress), paksa ubah jadi Pending Review
         await supabase.from("work_orders")
           .update({ status: "Pending Review" })
           .eq("id", activeWo.id);
 
-        // Catat ke Log Aktivitas kalau WO-nya nunggu di ACC
         await supabase.from("activity_logs").insert([{
           actor_name: techName,
           action_text: `menyelesaikan servis & mengirim Work Order ${activeWo.wo_number} ke tahap Pending ACC`,
           tipe_aktivitas: "Work Order"
         }]);
       } else {
-        // Kalau nggak ada WO yang jalan, catat log normal aja
         await supabase.from("activity_logs").insert([{
           actor_name: techName,
           action_text: `menyelesaikan laporan servis mandiri untuk mesin ${machineData.nama_mesin} (${machineData.product_id})`,

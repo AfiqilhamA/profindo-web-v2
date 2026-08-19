@@ -71,7 +71,6 @@ export default function WorkOrdersPage() {
     setModalMode("add");
     setSelectedWo(null);
     
-    // Pakai fungsi Ranel buat generate WO otomatis
     const woNumber = await generateUniqueWoNumber();
     
     setFormData({
@@ -118,7 +117,7 @@ export default function WorkOrdersPage() {
     };
 
     let error;
-    const actorName = localStorage.getItem("user_name") || "Admin"; // Konsisten pakai data login
+    const actorName = localStorage.getItem("user_name") || "Admin";
 
     if (modalMode === "add") {
       const { error: insErr } = await supabase.from("work_orders").insert([payload]);
@@ -199,7 +198,6 @@ export default function WorkOrdersPage() {
     }
   };
 
-  // --- UPDATE: Tambah Badge Pending Review ---
   const getStatusBadge = (status: string) => {
     if (status === "Completed") return <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2.5 py-1 rounded-md text-[11px] font-bold">Completed</span>;
     if (status === "Pending Review") return <span className="bg-purple-50 text-purple-600 border border-purple-200 px-2.5 py-1 rounded-md text-[11px] font-bold">Pending ACC</span>;
@@ -267,13 +265,17 @@ export default function WorkOrdersPage() {
                     
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-2">
-                        {/* --- UPDATE LOGIC TOMBOL ADMIN --- */}
+                        {/* ===================================== */}
+                        {/* INI BAGIAN TOMBOL YANG DIKUNCI */}
+                        {/* ===================================== */}
                         {wo.status === "Open" && (
                           <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "In Progress")} className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-md text-[11px] font-bold hover:bg-orange-200 transition-colors">Proses</button>
                         )}
+                        
                         {wo.status === "In Progress" && (
-                          <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "Pending Review")} className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-md text-[11px] font-bold hover:bg-purple-200 transition-colors">Review</button>
+                          <span className="px-3 py-1.5 bg-gray-100 text-gray-500 border border-gray-200 rounded-md text-[11px] font-bold cursor-not-allowed" title="Menunggu teknisi submit laporan dari lapangan">Nunggu Laporan</span>
                         )}
+
                         {wo.status === "Pending Review" && (
                           <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "Completed")} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md text-[11px] font-bold hover:bg-emerald-200 transition-colors">ACC Selesai</button>
                         )}
@@ -319,7 +321,6 @@ export default function WorkOrdersPage() {
                   <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black bg-white appearance-none">
                     <option value="Open">Open</option>
                     <option value="In Progress">In Progress</option>
-                    {/* TAMBAH OPSI PENDING REVIEW */}
                     <option value="Pending Review">Pending Review</option>
                     <option value="Completed">Completed</option>
                   </select>
