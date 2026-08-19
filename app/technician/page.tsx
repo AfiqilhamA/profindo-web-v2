@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../utils/supabase"; 
+import { supabase } from "../../utils/supabase";// Cek lagi path-nya ya kalau error, sesuaikan sama file aslinya!
 import { Html5Qrcode } from "html5-qrcode";
 
 export default function TechnicianPage() {
@@ -98,15 +98,12 @@ export default function TechnicianPage() {
   // FUNGSI LOGOUT YANG BENAR (HAPUS AUTH & COOKIE)
   // ==========================================
   const confirmLogout = async () => {
-    // 1. Sign out dari Supabase
     await supabase.auth.signOut();
 
-    // 2. Bersihin Cookie SSR biar proxy.ts tau kita udah keluar
     document.cookie = "user_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "user_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "admin_avatar=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     
-    // 3. Bersihin sisa lokal
     localStorage.clear();
     router.push("/login");
   };
@@ -203,6 +200,7 @@ export default function TechnicianPage() {
         }
       }
 
+      // 1. CATAT KE RIWAYAT SERVIS MESIN (Tetap Jalan Normal)
       const { error: serviceError } = await supabase.from("machine_services").insert([{
         machine_id: machineData.id,
         tanggal: new Date().toISOString().split('T')[0],
@@ -214,11 +212,36 @@ export default function TechnicianPage() {
 
       if (serviceError) throw serviceError;
 
-      await supabase.from("activity_logs").insert([{
-        actor_name: techName,
-        action_text: `menyelesaikan laporan servis untuk mesin ${machineData.nama_mesin} (${machineData.product_id})`,
-        tipe_aktivitas: "Work Order"
-      }]);
+      // 2. LOGIKA PINTAR: CEK WORK ORDER YANG LAGI IN PROGRESS BUAT MESIN INI
+      const { data: activeWo } = await supabase
+        .from("work_orders")
+        .select("id, wo_number")
+        .eq("machine_id", machineData.id)
+        .eq("status", "In Progress")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeWo) {
+        // Kalau ketemu WO nya, ubah statusnya jadi Pending Review
+        await supabase.from("work_orders")
+          .update({ status: "Pending Review" })
+          .eq("id", activeWo.id);
+
+        // Catat ke Log Aktivitas kalau WO-nya nunggu di ACC
+        await supabase.from("activity_logs").insert([{
+          actor_name: techName,
+          action_text: `menyelesaikan servis & mengirim Work Order ${activeWo.wo_number} ke tahap Pending ACC`,
+          tipe_aktivitas: "Work Order"
+        }]);
+      } else {
+        // Kalau nggak ada WO yang jalan, catat log normal aja
+        await supabase.from("activity_logs").insert([{
+          actor_name: techName,
+          action_text: `menyelesaikan laporan servis mandiri untuk mesin ${machineData.nama_mesin} (${machineData.product_id})`,
+          tipe_aktivitas: "Work Order"
+        }]);
+      }
 
       setIsSuccessOpen(true);
 
@@ -242,7 +265,6 @@ export default function TechnicianPage() {
 
   return (
     <div className="min-h-screen bg-[#Eef1F4] flex justify-center relative">
-      {/* ELEMEN TERSEMBUNYI BUAT BACA FILE GAMBAR */}
       <div id="reader-hidden" className="hidden"></div>
 
       <div className="w-full max-w-md bg-[#Eef1F4] min-h-screen relative shadow-2xl overflow-hidden flex flex-col">
@@ -311,7 +333,6 @@ export default function TechnicianPage() {
           {appState === "scanning_live" && (
             <div className="bg-white rounded-[24px] shadow-lg p-4 flex flex-col items-center gap-4 animate-in fade-in duration-300">
               <h3 className="text-[14px] font-bold text-gray-800">Arahkan Kamera ke QR Code</h3>
-              {/* Kotak ini otomatis diisi video kamera sama library html5-qrcode */}
               <div id="qr-reader" className="w-full rounded-[16px] overflow-hidden border-2 border-dashed border-blue-400"></div>
               
               <button 
@@ -474,7 +495,7 @@ export default function TechnicianPage() {
               <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
             </div>
             <h3 className="text-[16px] font-bold text-gray-900 mb-1">Berhasil!</h3>
-            <p className="text-[12px] text-gray-500 mb-6">Laporan servis berhasil dikirim dan dicatat ke Database.</p>
+            <p className="text-[12px] text-gray-500 mb-6">Laporan servis dikirim. Jika ada Work Order, statusnya otomatis berubah jadi Pending Review.</p>
             <button onClick={closeSuccessModal} className="w-full py-3 text-[12px] font-bold text-white bg-green-500 rounded-[12px] hover:bg-green-600 transition-colors">
               Oke, Selesai
             </button>

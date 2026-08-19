@@ -47,7 +47,7 @@ export default function WorkOrdersPage() {
         .select(`*, machines(nama_klien, nama_mesin), technicians(nama_lengkap)`)
         .order("created_at", { ascending: false }),
       supabase.from("machines").select("id, nama_mesin, nama_klien"),
-      supabase.from("technicians").select("*")
+      supabase.from("technicians").select("*").eq("is_deleted", false)
     ]);
 
     setWorkOrders(woRes.data || []);
@@ -163,7 +163,7 @@ export default function WorkOrdersPage() {
     const { error } = await supabase.from("work_orders").update({ status: statusModal.newStatus }).eq("id", statusModal.id);
     
     if (!error) {
-       const actorName = localStorage.getItem("user_name") || "Admin"; // Konsisten pakai data login
+       const actorName = localStorage.getItem("user_name") || "Admin"; 
        await supabase.from("activity_logs").insert([{
          actor_name: actorName, 
          action_text: `mengubah status ${statusModal.wo_number} menjadi ${statusModal.newStatus}`,
@@ -176,7 +176,6 @@ export default function WorkOrdersPage() {
          fetchData();
        }, 1500);
     } else {
-       // KALO GAGAL, KASIH TAU ERRORNYA
        setStatusModal({ ...statusModal, status: "error", message: error.message });
     }
   };
@@ -196,13 +195,14 @@ export default function WorkOrdersPage() {
         fetchData();
       }, 1500);
     } else {
-      // KALO GAGAL, KASIH TAU ERRORNYA
       setDeleteModal({ ...deleteModal, status: "error", message: error.message });
     }
   };
 
+  // --- UPDATE: Tambah Badge Pending Review ---
   const getStatusBadge = (status: string) => {
     if (status === "Completed") return <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2.5 py-1 rounded-md text-[11px] font-bold">Completed</span>;
+    if (status === "Pending Review") return <span className="bg-purple-50 text-purple-600 border border-purple-200 px-2.5 py-1 rounded-md text-[11px] font-bold">Pending ACC</span>;
     if (status === "In Progress") return <span className="bg-orange-50 text-orange-600 border border-orange-200 px-2.5 py-1 rounded-md text-[11px] font-bold">In Progress</span>;
     return <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-md text-[11px] font-bold">Open</span>;
   };
@@ -267,11 +267,15 @@ export default function WorkOrdersPage() {
                     
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-2">
+                        {/* --- UPDATE LOGIC TOMBOL ADMIN --- */}
                         {wo.status === "Open" && (
                           <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "In Progress")} className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-md text-[11px] font-bold hover:bg-orange-200 transition-colors">Proses</button>
                         )}
                         {wo.status === "In Progress" && (
-                          <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "Completed")} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md text-[11px] font-bold hover:bg-emerald-200 transition-colors">Selesai</button>
+                          <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "Pending Review")} className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-md text-[11px] font-bold hover:bg-purple-200 transition-colors">Review</button>
+                        )}
+                        {wo.status === "Pending Review" && (
+                          <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "Completed")} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md text-[11px] font-bold hover:bg-emerald-200 transition-colors">ACC Selesai</button>
                         )}
                         
                         <div className="w-px h-4 bg-gray-200 mx-1"></div>
@@ -315,6 +319,8 @@ export default function WorkOrdersPage() {
                   <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full border border-gray-200 rounded-[8px] px-3 py-2.5 text-[13px] outline-none focus:border-black bg-white appearance-none">
                     <option value="Open">Open</option>
                     <option value="In Progress">In Progress</option>
+                    {/* TAMBAH OPSI PENDING REVIEW */}
+                    <option value="Pending Review">Pending Review</option>
                     <option value="Completed">Completed</option>
                   </select>
                 </div>
