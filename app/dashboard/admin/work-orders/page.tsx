@@ -198,17 +198,18 @@ export default function WorkOrdersPage() {
     }
   };
 
+  // --- FIX UI: Tambah whitespace-nowrap biar gak ke-enter ke bawah ---
   const getStatusBadge = (status: string) => {
-    if (status === "Completed") return <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2.5 py-1 rounded-md text-[11px] font-bold">Completed</span>;
-    if (status === "Pending Review") return <span className="bg-purple-50 text-purple-600 border border-purple-200 px-2.5 py-1 rounded-md text-[11px] font-bold">Pending ACC</span>;
-    if (status === "In Progress") return <span className="bg-orange-50 text-orange-600 border border-orange-200 px-2.5 py-1 rounded-md text-[11px] font-bold">In Progress</span>;
-    return <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-md text-[11px] font-bold">Open</span>;
+    if (status === "Completed") return <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap">Completed</span>;
+    if (status === "Pending Review") return <span className="bg-purple-50 text-purple-600 border border-purple-200 px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap">Pending ACC</span>;
+    if (status === "In Progress") return <span className="bg-orange-50 text-orange-600 border border-orange-200 px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap">In Progress</span>;
+    return <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap">Open</span>;
   };
 
   const getPriorityBadge = (priority: string) => {
-    if (priority === "High") return <span className="text-red-600 font-bold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-600"></div> High</span>;
-    if (priority === "Medium") return <span className="text-orange-500 font-bold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div> Medium</span>;
-    return <span className="text-gray-500 font-bold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div> Low</span>;
+    if (priority === "High") return <span className="text-red-600 font-bold flex items-center gap-1 whitespace-nowrap"><div className="w-1.5 h-1.5 rounded-full bg-red-600"></div> High</span>;
+    if (priority === "Medium") return <span className="text-orange-500 font-bold flex items-center gap-1 whitespace-nowrap"><div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div> Medium</span>;
+    return <span className="text-gray-500 font-bold flex items-center gap-1 whitespace-nowrap"><div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div> Low</span>;
   };
 
   return (
@@ -239,15 +240,16 @@ export default function WorkOrdersPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+            <table className="w-full text-left border-collapse min-w-[950px]">
               <thead className="bg-gray-50/80 border-b border-gray-200">
                 <tr>
                   <th className="p-4 text-[12px] font-bold text-gray-600 w-[140px]">WO Number</th>
                   <th className="p-4 text-[12px] font-bold text-gray-600 min-w-[200px]">Klien & Mesin</th>
                   <th className="p-4 text-[12px] font-bold text-gray-600 w-[160px]">Teknisi</th>
-                  <th className="p-4 text-[12px] font-bold text-gray-600 w-[120px]">Prioritas</th>
-                  <th className="p-4 text-[12px] font-bold text-gray-600 w-[120px]">Status</th>
-                  <th className="p-4 text-[12px] font-bold text-gray-600 w-[180px] text-center">Aksi (Ubah Status)</th>
+                  <th className="p-4 text-[12px] font-bold text-gray-600 w-[100px]">Prioritas</th>
+                  {/* --- FIX UI: Lebarin dikit kolom tabel --- */}
+                  <th className="p-4 text-[12px] font-bold text-gray-600 w-[140px]">Status</th>
+                  <th className="p-4 text-[12px] font-bold text-gray-600 w-[200px] text-center">Aksi (Ubah Status)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
@@ -265,19 +267,17 @@ export default function WorkOrdersPage() {
                     
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-2">
-                        {/* ===================================== */}
-                        {/* INI BAGIAN TOMBOL YANG DIKUNCI */}
-                        {/* ===================================== */}
+                        {/* --- FIX UI: Tambah whitespace-nowrap ke Action Buttons --- */}
                         {wo.status === "Open" && (
-                          <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "In Progress")} className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-md text-[11px] font-bold hover:bg-orange-200 transition-colors">Proses</button>
+                          <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "In Progress")} className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-md text-[11px] font-bold hover:bg-orange-200 transition-colors whitespace-nowrap">Proses</button>
                         )}
                         
                         {wo.status === "In Progress" && (
-                          <span className="px-3 py-1.5 bg-gray-100 text-gray-500 border border-gray-200 rounded-md text-[11px] font-bold cursor-not-allowed" title="Menunggu teknisi submit laporan dari lapangan">Nunggu Laporan</span>
+                          <span className="px-3 py-1.5 bg-gray-100 text-gray-500 border border-gray-200 rounded-md text-[11px] font-bold cursor-not-allowed whitespace-nowrap" title="Menunggu teknisi submit laporan dari lapangan">Nunggu Laporan</span>
                         )}
 
                         {wo.status === "Pending Review" && (
-                          <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "Completed")} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md text-[11px] font-bold hover:bg-emerald-200 transition-colors">ACC Selesai</button>
+                          <button onClick={() => triggerStatusUpdate(wo.id, wo.wo_number, "Completed")} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md text-[11px] font-bold hover:bg-emerald-200 transition-colors whitespace-nowrap">ACC Selesai</button>
                         )}
                         
                         <div className="w-px h-4 bg-gray-200 mx-1"></div>

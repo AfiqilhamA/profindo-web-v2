@@ -27,6 +27,7 @@ export default function TechnicianPage() {
   const [machineData, setMachineData] = useState<any>(null);
   const [detailPekerjaan, setDetailPekerjaan] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
+  const [fotoTimestamp, setFotoTimestamp] = useState(""); // <-- STATE BARU BUAT JAM CCTV
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ==========================================
@@ -76,9 +77,7 @@ export default function TechnicianPage() {
             }).catch(console.error);
           }
         },
-        (errorMessage) => {
-          // Abaikan error saat proses nyari QR
-        }
+        (errorMessage) => {}
       ).catch(err => {
         alert("Gagal mengakses kamera. Pastikan izin kamera diberikan.");
         setAppState("idle");
@@ -97,11 +96,9 @@ export default function TechnicianPage() {
   // ==========================================
   const confirmLogout = async () => {
     await supabase.auth.signOut();
-
     document.cookie = "user_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "user_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "admin_avatar=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    
     localStorage.clear();
     router.push("/login");
   };
@@ -162,9 +159,14 @@ export default function TechnicianPage() {
     }
   };
 
+  // --- LOGIKA BARU: TANGKAP WAKTU SAAT FOTO DIAMBIL ---
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFoto(e.target.files[0]);
+      // Bikin Timestamp Format: 19 Aug 2026, 17:22 WIB
+      const now = new Date();
+      const formattedTime = now.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' WIB';
+      setFotoTimestamp(formattedTime);
     }
   };
 
@@ -212,13 +214,12 @@ export default function TechnicianPage() {
         .from("work_orders")
         .select("id, wo_number")
         .eq("machine_id", machineData.id)
-        .in("status", ["Open", "In Progress"]) // <--- TOLERANSI BUAT ADMIN YANG LUPA KLIK
+        .in("status", ["Open", "In Progress"]) 
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (activeWo) {
-        // Kalau ketemu WO nya (baik Open/In Progress), paksa ubah jadi Pending Review
         await supabase.from("work_orders")
           .update({ status: "Pending Review" })
           .eq("id", activeWo.id);
@@ -251,6 +252,7 @@ export default function TechnicianPage() {
     setScannedId("");
     setDetailPekerjaan("");
     setFoto(null);
+    setFotoTimestamp(""); // Reset waktu
     setMachineData(null);
   };
 
@@ -262,11 +264,8 @@ export default function TechnicianPage() {
 
       <div className="w-full max-w-md bg-[#Eef1F4] min-h-screen relative shadow-2xl overflow-hidden flex flex-col">
         
-        {/* ======================================= */}
         {/* HEADER */}
-        {/* ======================================= */}
         <div className="bg-[#0A1128] pt-12 pb-24 px-8 rounded-b-[40px] relative shrink-0">
-          
           {appState === "form" && (
             <button 
               onClick={() => { setAppState("idle"); setMachineData(null); }} 
@@ -293,51 +292,36 @@ export default function TechnicianPage() {
           )}
         </div>
 
-        {/* ======================================= */}
         {/* KONTEN UTAMA */}
-        {/* ======================================= */}
         <div className="flex-1 px-6 -mt-16 relative z-10 pb-10">
           
           {/* MENU AWAL */}
           {appState === "idle" && (
             <div className="bg-white rounded-[24px] shadow-lg p-6 flex flex-col gap-4 animate-in slide-in-from-bottom-4 duration-500">
-              
-              <button 
-                onClick={() => setAppState("scanning_live")}
-                className="w-full bg-[#3B82F6] hover:bg-blue-600 text-white rounded-[14px] py-4 flex items-center justify-center gap-2 font-bold text-sm transition-transform active:scale-95 shadow-md shadow-blue-500/30"
-              >
+              <button onClick={() => setAppState("scanning_live")} className="w-full bg-[#3B82F6] hover:bg-blue-600 text-white rounded-[14px] py-4 flex items-center justify-center gap-2 font-bold text-sm transition-transform active:scale-95 shadow-md shadow-blue-500/30">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 Scan Live QR
               </button>
               
               <input type="file" accept="image/*" ref={fileInputRef} onChange={handleQRFileChange} className="hidden" />
               
-              <button 
-                onClick={handleUploadQRClick}
-                className="w-full bg-[#F0F4FF] text-[#3B82F6] border border-[#Dbeafe] rounded-[14px] py-4 flex items-center justify-center gap-2 font-bold text-sm transition-transform active:scale-95"
-              >
+              <button onClick={handleUploadQRClick} className="w-full bg-[#F0F4FF] text-[#3B82F6] border border-[#Dbeafe] rounded-[14px] py-4 flex items-center justify-center gap-2 font-bold text-sm transition-transform active:scale-95">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                 Upload Foto QR
               </button>
             </div>
           )}
 
-          {/* AREA KAMERA SCANNER */}
           {appState === "scanning_live" && (
             <div className="bg-white rounded-[24px] shadow-lg p-4 flex flex-col items-center gap-4 animate-in fade-in duration-300">
               <h3 className="text-[14px] font-bold text-gray-800">Arahkan Kamera ke QR Code</h3>
               <div id="qr-reader" className="w-full rounded-[16px] overflow-hidden border-2 border-dashed border-blue-400"></div>
-              
-              <button 
-                onClick={() => setAppState("idle")} 
-                className="w-full py-3 mt-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-[12px] font-bold text-[13px] transition-colors"
-              >
+              <button onClick={() => setAppState("idle")} className="w-full py-3 mt-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-[12px] font-bold text-[13px] transition-colors">
                 Batal Scan
               </button>
             </div>
           )}
 
-          {/* LOADING UPLOAD QR */}
           {appState === "scanning_upload" && (
             <div className="bg-white rounded-[24px] shadow-lg p-10 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
               <div className="relative w-16 h-16">
@@ -348,7 +332,6 @@ export default function TechnicianPage() {
             </div>
           )}
 
-          {/* FORM LAPORAN SERVIS */}
           {appState === "form" && machineData && (
             <form onSubmit={handleSubmitClick} className="flex flex-col gap-6 animate-in slide-in-from-bottom-4 duration-500">
               
@@ -372,22 +355,23 @@ export default function TechnicianPage() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-[13px] font-bold text-[#0A1128] mb-3 ml-1">Detail Pekerjaan</h3>
-                  <textarea 
-                    rows={4}
-                    value={detailPekerjaan}
-                    onChange={(e) => setDetailPekerjaan(e.target.value)}
-                    placeholder="Jelaskan komponen yang diganti atau diperbaiki..."
-                    className="w-full bg-white border border-gray-200 rounded-[16px] p-4 text-[13px] text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all resize-none shadow-sm"
-                    required
-                  ></textarea>
+                  <textarea rows={4} value={detailPekerjaan} onChange={(e) => setDetailPekerjaan(e.target.value)} placeholder="Jelaskan komponen yang diganti atau diperbaiki..." className="w-full bg-white border border-gray-200 rounded-[16px] p-4 text-[13px] text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all resize-none shadow-sm" required></textarea>
                 </div>
 
                 <div>
                   <h3 className="text-[13px] font-bold text-[#0A1128] mb-3 ml-1">Dokumentasi</h3>
                   {foto ? (
-                    <div className="relative w-full h-40 rounded-[16px] border-2 border-dashed border-[#3B82F6] overflow-hidden group mb-3 shadow-sm">
-                      <img src={URL.createObjectURL(foto)} alt="Preview" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => setFoto(null)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md">
+                    // --- PREVIEW FOTO + CCTV TIMESTAMP ---
+                    <div className="relative w-full h-48 rounded-[16px] border-2 border-dashed border-[#3B82F6] overflow-hidden group mb-3 shadow-sm bg-black">
+                      <img src={URL.createObjectURL(foto)} alt="Preview" className="w-full h-full object-contain" />
+                      
+                      {/* Timestamp CCTV Overlay */}
+                      <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded text-[10px] font-mono text-white flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_4px_rgba(239,68,68,0.8)]"></span>
+                        {fotoTimestamp}
+                      </div>
+
+                      <button type="button" onClick={() => {setFoto(null); setFotoTimestamp("");}} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 transition-colors">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                       </button>
                     </div>
@@ -407,16 +391,9 @@ export default function TechnicianPage() {
                   )}
                 </div>
 
-                <button 
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`mt-4 w-full bg-[#00C2FF] hover:bg-cyan-500 text-white rounded-full py-4 font-bold text-[14px] shadow-lg shadow-cyan-500/30 transition-transform flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-70' : 'active:scale-95'}`}
-                >
+                <button type="submit" disabled={isSubmitting} className={`mt-4 w-full bg-[#00C2FF] hover:bg-cyan-500 text-white rounded-full py-4 font-bold text-[14px] shadow-lg shadow-cyan-500/30 transition-transform flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-70' : 'active:scale-95'}`}>
                   {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                      Menyimpan...
-                    </>
+                    <><svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menyimpan...</>
                   ) : "Kirim Laporan Servis"}
                 </button>
               </div>
@@ -425,39 +402,24 @@ export default function TechnicianPage() {
         </div>
       </div>
 
-      {/* ========================================= */}
       {/* MODAL HASIL SCAN */}
-      {/* ========================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[320px] p-6 animate-in zoom-in-95 duration-200">
             <h3 className="text-[16px] font-bold text-gray-900 mb-1">Data QR Code</h3>
             <p className="text-[12px] text-gray-500 mb-5">Silahkan konfirmasi atau masukkan Product ID mesin.</p>
             <form onSubmit={processScan}>
-              <input 
-                type="text" 
-                placeholder="Contoh: PFD-23772938"
-                value={scannedId}
-                onChange={(e) => setScannedId(e.target.value)}
-                autoFocus
-                className="w-full border border-gray-200 rounded-[12px] px-4 py-3 text-[13px] font-bold outline-none focus:border-[#3B82F6] transition-colors mb-6"
-              />
+              <input type="text" placeholder="Contoh: PFD-23772938" value={scannedId} onChange={(e) => setScannedId(e.target.value)} autoFocus className="w-full border border-gray-200 rounded-[12px] px-4 py-3 text-[13px] font-bold outline-none focus:border-[#3B82F6] transition-colors mb-6" />
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-[12px] font-bold text-gray-500 hover:bg-gray-100 rounded-[8px] transition-colors">
-                  Batal
-                </button>
-                <button type="submit" className="px-4 py-2 text-[12px] font-bold text-white bg-[#3B82F6] hover:bg-blue-600 rounded-[8px] shadow-sm transition-colors">
-                  Proses
-                </button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-[12px] font-bold text-gray-500 hover:bg-gray-100 rounded-[8px] transition-colors">Batal</button>
+                <button type="submit" className="px-4 py-2 text-[12px] font-bold text-white bg-[#3B82F6] hover:bg-blue-600 rounded-[8px] shadow-sm transition-colors">Proses</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ========================================= */}
       {/* MODAL 1: KONFIRMASI SEBELUM KIRIM */}
-      {/* ========================================= */}
       {isSubmitConfirmOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[320px] p-6 text-center animate-in zoom-in-95 duration-200">
@@ -467,20 +429,14 @@ export default function TechnicianPage() {
             <h3 className="text-[16px] font-bold text-gray-900 mb-1">Kirim Laporan?</h3>
             <p className="text-[12px] text-gray-500 mb-6">Pastikan detail pekerjaan dan dokumentasi foto sudah benar.</p>
             <div className="flex gap-3">
-              <button onClick={() => setIsSubmitConfirmOpen(false)} className="flex-1 py-3 text-[12px] font-bold text-gray-600 bg-gray-100 rounded-[12px] hover:bg-gray-200 transition-colors">
-                Periksa Lagi
-              </button>
-              <button onClick={executeSubmit} className="flex-1 py-3 text-[12px] font-bold text-white bg-[#3B82F6] rounded-[12px] hover:bg-blue-700 transition-colors">
-                Ya, Kirim
-              </button>
+              <button onClick={() => setIsSubmitConfirmOpen(false)} className="flex-1 py-3 text-[12px] font-bold text-gray-600 bg-gray-100 rounded-[12px] hover:bg-gray-200 transition-colors">Periksa Lagi</button>
+              <button onClick={executeSubmit} className="flex-1 py-3 text-[12px] font-bold text-white bg-[#3B82F6] rounded-[12px] hover:bg-blue-700 transition-colors">Ya, Kirim</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================= */}
       {/* MODAL 2: SUKSES TERKIRIM */}
-      {/* ========================================= */}
       {isSuccessOpen && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[320px] p-6 text-center animate-in zoom-in-95 duration-200">
@@ -489,16 +445,12 @@ export default function TechnicianPage() {
             </div>
             <h3 className="text-[16px] font-bold text-gray-900 mb-1">Berhasil!</h3>
             <p className="text-[12px] text-gray-500 mb-6">Laporan servis dikirim. Jika ada Work Order, statusnya otomatis berubah jadi Pending Review.</p>
-            <button onClick={closeSuccessModal} className="w-full py-3 text-[12px] font-bold text-white bg-green-500 rounded-[12px] hover:bg-green-600 transition-colors">
-              Oke, Selesai
-            </button>
+            <button onClick={closeSuccessModal} className="w-full py-3 text-[12px] font-bold text-white bg-green-500 rounded-[12px] hover:bg-green-600 transition-colors">Oke, Selesai</button>
           </div>
         </div>
       )}
 
-      {/* ========================================= */}
       {/* MODAL LOGOUT */}
-      {/* ========================================= */}
       {isLogoutModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[320px] p-6 text-center animate-in zoom-in-95 duration-200">
@@ -508,12 +460,8 @@ export default function TechnicianPage() {
             <h3 className="text-[16px] font-bold text-gray-900 mb-1">Akhiri Sesi?</h3>
             <p className="text-[12px] text-gray-500 mb-6">Anda akan keluar dari Portal Teknisi.</p>
             <div className="flex gap-3">
-              <button onClick={() => setIsLogoutModalOpen(false)} className="flex-1 py-3 text-[12px] font-bold text-gray-600 bg-gray-100 rounded-[12px] hover:bg-gray-200 transition-colors">
-                Batal
-              </button>
-              <button onClick={confirmLogout} className="flex-1 py-3 text-[12px] font-bold text-white bg-[#E11D48] rounded-[12px] hover:bg-rose-700 transition-colors">
-                Ya, Keluar
-              </button>
+              <button onClick={() => setIsLogoutModalOpen(false)} className="flex-1 py-3 text-[12px] font-bold text-gray-600 bg-gray-100 rounded-[12px] hover:bg-gray-200 transition-colors">Batal</button>
+              <button onClick={confirmLogout} className="flex-1 py-3 text-[12px] font-bold text-white bg-[#E11D48] rounded-[12px] hover:bg-rose-700 transition-colors">Ya, Keluar</button>
             </div>
           </div>
         </div>

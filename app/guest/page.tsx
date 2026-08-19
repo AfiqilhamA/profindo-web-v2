@@ -12,8 +12,9 @@ export default function GuestPage() {
   const [appState, setAppState] = useState<"idle" | "scanning_live" | "scanning_upload" | "result">("idle");
   const [viewMode, setViewMode] = useState<"timeline" | "table">("timeline");
 
-  // State Modal (Modal Logout resmi dibuang sesuai ide lu!)
+  // State Modal & Preview
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{url: string, timestamp: string} | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,9 +44,7 @@ export default function GuestPage() {
             }).catch(console.error);
           }
         },
-        (errorMessage) => {
-          // Abaikan error saat lagi nyari titik fokus QR
-        }
+        (errorMessage) => {}
       ).catch(err => {
         alert("Gagal mengakses kamera. Pastikan izin kamera diberikan.");
         setAppState("idle");
@@ -133,18 +132,44 @@ export default function GuestPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   };
+  
+  // --- FUNGSI FORMAT TIMESTAMP CCTV ---
+  const getTimestamp = (service: any) => {
+    // Kalau ada created_at (jam aslinya masuk database), pakai itu
+    if (service.created_at) {
+      const date = new Date(service.created_at);
+      return date.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    }
+    // Fallback kalau cuma ada tanggal
+    return formatDate(service.tanggal) + ' - Recorded';
+  };
+
+  // --- FUNGSI DOWNLOAD GAMBAR ---
+  const downloadImage = async (imageUrl: string) => {
+    try {
+      // Ambil file sebagai Blob biar bisa dipaksa download
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Dokumentasi_${machineData?.product_id}_${Date.now()}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      // Kalau gagal fetch Blob (CORS), buka di tab baru sebagai gantinya
+      window.open(imageUrl, '_blank');
+    }
+  };
+
   const today = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Fungsi Keluar Langsung (Instant Logout & Hapus Cookie!)
   const handleLogout = () => {
-    // 1. Hapus Cookie Guest biar nggak nyangkut di proxy.ts
     document.cookie = "user_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "user_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    
-    // 2. Bersihin localStorage
     localStorage.clear();
-    
-    // 3. Balik ke halaman login
     router.push("/login");
   };
 
@@ -163,7 +188,6 @@ export default function GuestPage() {
             </button>
           )}
 
-          {/* TOMBOL KELUAR LANGSUNG TANPA MODAL */}
           <button onClick={handleLogout} className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> Keluar
           </button>
@@ -271,9 +295,8 @@ export default function GuestPage() {
                     {/* TAMPILAN TIMELINE (ZIGZAG VERTIKAL) */}
                     {viewMode === "timeline" && (
                       <div className="relative border-l-2 border-gray-100 ml-2 space-y-8 pb-4">
-                        {serviceHistory.map((service, index) => (
+                        {serviceHistory.map((service) => (
                           <div key={service.id} className="relative pl-6">
-                            {/* Titik Zigzag */}
                             <div className="absolute -left-[9px] top-1 w-4 h-4 bg-emerald-500 rounded-full border-4 border-white shadow-sm"></div>
 
                             <p className="text-[11px] font-bold text-emerald-600 mb-1">{formatDate(service.tanggal)}</p>
@@ -287,10 +310,26 @@ export default function GuestPage() {
                               <span className="text-[10px] font-bold text-gray-600">Teknisi: {service.pic || "Tidak diketahui"}</span>
                             </div>
 
-                            {/* Kalau ada foto */}
+                            {/* --- FOTO DENGAN TIMESTAMP & KLIK PREVIEW --- */}
                             {service.foto_dokumentasi && (
-                              <div className="mt-4 rounded-[12px] overflow-hidden border border-gray-200">
-                                <img src={service.foto_dokumentasi} alt="Dokumentasi" className="w-full h-32 object-cover" />
+                              <div 
+                                onClick={() => setPreviewImage({ url: service.foto_dokumentasi, timestamp: getTimestamp(service) })}
+                                className="mt-4 relative rounded-[12px] overflow-hidden border border-gray-200 cursor-pointer group shadow-sm hover:shadow-md transition-all"
+                              >
+                                <img src={service.foto_dokumentasi} alt="Dokumentasi" className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-500" />
+                                
+                                {/* Overlay Gelap Hover */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                                  <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity transform scale-75 group-hover:scale-100 duration-300">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
+                                  </div>
+                                </div>
+                                
+                                {/* Timestamp ala CCTV */}
+                                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded text-[10px] font-mono text-white flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_4px_rgba(239,68,68,0.8)]"></span>
+                                  {getTimestamp(service)}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -355,6 +394,42 @@ export default function GuestPage() {
           </div>
         </div>
       )}
+
+      {/* ========================================= */}
+      {/* MODAL POP-UP PREVIEW GAMBAR & DOWNLOAD */}
+      {/* ========================================= */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-300">
+          
+          <button 
+            onClick={() => setPreviewImage(null)} 
+            className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+
+          <div className="w-full max-w-lg px-4 flex flex-col items-center">
+            <div className="relative w-full overflow-hidden rounded-[16px] shadow-2xl ring-1 ring-white/10 animate-in zoom-in-95 duration-300">
+              <img src={previewImage.url} alt="Preview Bukti Servis" className="w-full h-auto max-h-[70vh] object-contain bg-black" />
+              
+              {/* Timestamp CCTV besar di Preview */}
+              <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-[8px] text-[13px] font-mono text-white flex items-center gap-2 border border-white/10">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_6px_rgba(239,68,68,1)]"></span>
+                {previewImage.timestamp}
+              </div>
+            </div>
+
+            <button 
+              onClick={() => downloadImage(previewImage.url)}
+              className="mt-8 flex items-center gap-2 bg-[#10B981] hover:bg-emerald-500 text-white px-8 py-3.5 rounded-full font-bold text-[14px] transition-transform active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              Download Foto Bukti
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
