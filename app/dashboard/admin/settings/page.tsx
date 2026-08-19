@@ -231,7 +231,8 @@ export default function SettingsPage() {
       <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
         
         {/* === SIDEBAR KIRI (RESPONSIF MENU) === */}
-        <div className="w-full md:w-[240px] shrink-0 bg-white border border-gray-200 rounded-[16px] p-2 shadow-sm flex flex-row md:flex-col overflow-x-auto md:overflow-visible gap-2 md:sticky md:top-24 [&::-webkit-scrollbar]:hidden">
+        {/* md:sticky dan md:top-24 SUDAH DIHAPUS DARI SINI */}
+        <div className="w-full md:w-[240px] shrink-0 bg-white border border-gray-200 rounded-[16px] p-2 shadow-sm flex flex-row md:flex-col overflow-x-auto md:overflow-visible gap-2 [&::-webkit-scrollbar]:hidden">
           <button onClick={() => setActiveTab("whatsapp")} className={`shrink-0 flex items-center gap-2 md:gap-3 px-4 py-2.5 md:py-3 rounded-[10px] text-[12px] md:text-[13px] font-bold transition-all text-left ${activeTab === "whatsapp" ? "bg-black text-white" : "text-gray-600 hover:bg-gray-100"}`}>
             <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
             WhatsApp

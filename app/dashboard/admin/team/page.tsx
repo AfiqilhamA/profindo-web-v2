@@ -51,7 +51,7 @@ export default function TeamPage() {
     const { data, error } = await supabase
       .from("technicians")
       .select("*")
-      .eq("is_deleted", false) // Filter ini yang bikin dia ngilang dari daftar
+      .eq("is_deleted", false)
       .order("created_at", { ascending: false });
       
     if (!error) setTeam(data || []);
@@ -86,6 +86,7 @@ export default function TeamPage() {
     setSubmitModal({ isOpen: true, status: "confirm" });
   };
 
+  // --- LOGIKA EDIT DIPERBARUI: Kirim ke API VIP ---
   const executeEdit = async () => {
     setSubmitModal({ isOpen: true, status: "saving" });
     let fotoUrl = selectedTech.foto_profil;
@@ -100,21 +101,34 @@ export default function TeamPage() {
       }
     }
 
-    const { error } = await supabase.from("technicians").update({
-      nama_lengkap: editFormData.nama_lengkap, email: editFormData.email, username: editFormData.username,
-      no_whatsapp: editFormData.no_whatsapp, role: editFormData.role, password: editFormData.password,
-      foto_profil: fotoUrl
-    }).eq("id", selectedTech.id);
+    try {
+      const response = await fetch('/api/admin/update-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedTech.id,
+          email: editFormData.email,
+          password: editFormData.password, // Bakal dikirim, kosong atau isi
+          nama_lengkap: editFormData.nama_lengkap,
+          username: editFormData.username,
+          no_whatsapp: editFormData.no_whatsapp,
+          role: editFormData.role,
+          fotoUrl: fotoUrl
+        })
+      });
 
-    if (error) {
-      setSubmitModal({ isOpen: true, status: "error", message: "Gagal menyimpan perubahan: " + error.message });
-    } else {
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Gagal mengupdate teknisi");
+
       setSubmitModal({ isOpen: true, status: "success" });
       setTimeout(() => {
         setSubmitModal({ isOpen: false, status: "confirm" });
         setIsEditModalOpen(false);
         fetchTeam();
       }, 1500);
+
+    } catch (error: any) {
+      setSubmitModal({ isOpen: true, status: "error", message: error.message });
     }
   };
 
@@ -129,7 +143,7 @@ export default function TeamPage() {
     
     const { error } = await supabase
       .from("technicians")
-      .update({ is_deleted: true }) // Kita umpetin, gak kita hapus permanen!
+      .update({ is_deleted: true }) 
       .eq("id", deleteModal.id);
     
     if (error) {
@@ -138,7 +152,6 @@ export default function TeamPage() {
     } else {
       setDeleteModal({ ...deleteModal, status: "success" });
       
-      // Auto Log Activity
       await supabase.from("activity_logs").insert([{
         actor_name: "Admin",
         action_text: `memindahkan ${deleteModal.nama} ke tempat sampah`,
@@ -239,7 +252,8 @@ export default function TeamPage() {
                     setEditFotoFile(null);
                     setEditFormData({
                       nama_lengkap: tech.nama_lengkap || "", email: tech.email || "", username: tech.username || "",
-                      no_whatsapp: tech.no_whatsapp || "", role: tech.role || "Technician (Lapangan)", password: tech.password || ""
+                      no_whatsapp: tech.no_whatsapp || "", role: tech.role || "Technician (Lapangan)", 
+                      password: "" // <-- Ini gue jamin kosong melompong dari awal!
                     });
                     setIsEditModalOpen(true);
                   }} className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-[8px] text-gray-400 hover:text-black hover:border-gray-400 hover:bg-gray-50 transition-colors">
@@ -306,10 +320,10 @@ export default function TeamPage() {
                   </select>
                   <svg className="absolute right-3 top-[30px] w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
-                <div className="space-y-1.5 relative md:col-span-2">
-                  <label className="text-[12px] font-bold text-gray-700">Password</label>
-                  <input type={showPassword ? "text" : "password"} name="password" required value={editFormData.password} onChange={handleEditChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-black pr-10" />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-[30px] text-gray-400 hover:text-black">
+                <div className="space-y-1.5 relative md:col-span-2 bg-blue-50/30 p-3 rounded-[8px] border border-blue-100">
+                  <label className="text-[12px] font-bold text-blue-900">Ganti Password <span className="text-gray-500 font-normal">(Kosongkan jika tidak ingin ganti)</span></label>
+                  <input type={showPassword ? "text" : "password"} name="password" placeholder="Ketik password baru di sini..." value={editFormData.password} onChange={handleEditChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-blue-500 mt-1 pr-10" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-[38px] text-gray-400 hover:text-black">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                   </button>
                 </div>
@@ -331,13 +345,14 @@ export default function TeamPage() {
         </div>
       )}
 
+      {/* MODAL NOTIFIKASI */}
       {submitModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[400px] p-8 text-center animate-in zoom-in-95 duration-200">
             {submitModal.status === "error" ? (
               <>
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5 border border-red-200"><svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg></div>
-                <h3 className="text-[18px] font-bold text-gray-900 mb-2">Pengecekan Gagal</h3>
+                <h3 className="text-[18px] font-bold text-gray-900 mb-2">Gagal Disimpan</h3>
                 <p className="text-[13px] text-gray-500 mb-8">{submitModal.message}</p>
                 <button onClick={() => setSubmitModal({ isOpen: false, status: "confirm" })} className="w-full px-6 py-2.5 text-[13px] font-bold text-white bg-black rounded-[10px] hover:bg-gray-800 transition-colors">Tutup & Perbaiki</button>
               </>
