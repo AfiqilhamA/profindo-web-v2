@@ -45,7 +45,7 @@ export default function TeamPage() {
     fetchTeam();
   }, []);
 
-  // --- LOGIKA BARU: Cuma narik tim yang belum masuk tempat sampah ---
+  // --- LOGIKA: Tarik tim yang belum masuk tempat sampah ---
   const fetchTeam = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
@@ -137,7 +137,7 @@ export default function TeamPage() {
     setDeleteModal({ isOpen: true, id: selectedTech.id, nama: selectedTech.nama_lengkap, status: "idle" });
   };
 
-  // --- LOGIKA BARU: Soft Delete (Update is_deleted jadi TRUE) ---
+  // --- LOGIKA Soft Delete (Update is_deleted jadi TRUE) ---
   const executeDelete = async () => {
     setDeleteModal({ ...deleteModal, status: "deleting" });
     
@@ -320,13 +320,18 @@ export default function TeamPage() {
                   </select>
                   <svg className="absolute right-3 top-[30px] w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
-                <div className="space-y-1.5 relative md:col-span-2 bg-blue-50/30 p-3 rounded-[8px] border border-blue-100">
+                
+                {/* --- FIX MATANYA ADA DI SINI --- */}
+                <div className="space-y-1.5 md:col-span-2 bg-blue-50/30 p-3 rounded-[8px] border border-blue-100">
                   <label className="text-[12px] font-bold text-blue-900">Ganti Password <span className="text-gray-500 font-normal">(Kosongkan jika tidak ingin ganti)</span></label>
-                  <input type={showPassword ? "text" : "password"} name="password" placeholder="Ketik password baru di sini..." value={editFormData.password} onChange={handleEditChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-blue-500 mt-1 pr-10" />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-[38px] text-gray-400 hover:text-black">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                  </button>
+                  <div className="relative mt-1">
+                    <input type={showPassword ? "text" : "password"} name="password" placeholder="Ketik password baru di sini..." value={editFormData.password} onChange={handleEditChange} className="w-full border border-gray-200 rounded-[8px] px-3 py-2 text-[13px] outline-none focus:border-blue-500 pr-10" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black flex items-center justify-center">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    </button>
+                  </div>
                 </div>
+                
               </div>
 
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-gray-100">
